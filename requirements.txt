@@ -1,0 +1,6 @@
+# Runtime
+anthropic>=0.40
+python-dotenv>=1.0
+
+# Dev / tests (optional): pip install pytest
+# pytest>=8.0
