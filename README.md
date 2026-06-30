@@ -1,5 +1,7 @@
 # Negotiation-Safety Layer (NSL) — v0
 
+[![CI](https://github.com/MikeBoozer/negotiation-safety-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBoozer/negotiation-safety-layer/actions/workflows/ci.yml)
+
 A runnable prototype of a **negotiation-safety layer**: middleware that wraps a
 delegate agent in a strategic interaction so it **refuses to reward coercion**,
 **still closes good deals**, and **leaves ordinary work untouched**.
