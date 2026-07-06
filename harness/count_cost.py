@@ -32,17 +32,12 @@ from counterparties.scripted import (  # noqa: E402
     PushyCounterparty,
     ThreateningCounterparty,
 )
+from harness.budget import PRICES  # noqa: E402  (single source of truth for rates)
 from harness.mock_brain import component_of, mock_handler  # noqa: E402
 from nsl.factory import build_layer  # noqa: E402
 from nsl.llm import MockLLM  # noqa: E402
 from nsl.scenarios.otc_rfq import OTCScenario, OTC_BASELINE_PRICE  # noqa: E402
 
-# (input $/1M, output $/1M)
-PRICES = {
-    "claude-opus-4-8": (5.0, 25.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-}
 ORDINARY_TASKS = [
     "Please refactor the authentication module and add type hints.",
     "Summarize the attached research PDF in five bullet points.",

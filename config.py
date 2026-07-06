@@ -9,6 +9,13 @@ Model ids are the current Claude ids (see the claude-api skill):
 DETECTOR_MODEL = "claude-haiku-4-5"
 NEGOTIATOR_MODEL = "claude-opus-4-8"
 VERIFIER_MODEL = "claude-sonnet-4-6"
+# The experiment's adversary (counterparties/llm_counterparty.py): cheap,
+# capable, and a different model than the Opus negotiator.
+COUNTERPARTY_MODEL = "claude-sonnet-4-6"
+
+# HARD cap on cumulative estimated live spend for harness/run_experiment.py
+# (user-approved 2026-07-05). The guard refuses to start episodes past this.
+EXPERIMENT_BUDGET_CAP_USD = 15.0
 
 # Max times the verifier bounces a blocked action back to the negotiator
 # before the orchestrator falls back to a safe default.

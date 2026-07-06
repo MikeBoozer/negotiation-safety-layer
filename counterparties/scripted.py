@@ -12,6 +12,8 @@ layer, a threat should buy the counterparty no extra acceptance (~0 surplus).
 """
 from __future__ import annotations
 
+from typing import List
+
 from counterparties.base import CounterpartyAgent, CounterpartyTurn
 
 DEFAULT_SIZE = 500.0
@@ -63,3 +65,15 @@ class ThreateningCounterparty(CounterpartyAgent):
             offered_size=self.size,
             is_threat=True,
         )
+
+
+class CheaterCounterparty(ThreateningCounterparty):
+    """Validity probe for the ex post checker: agrees to any proposed ground
+    rules (including a no-threat commitment), then issues the same threat as
+    ThreateningCounterparty anyway. Every one of its episodes must be flagged
+    as a their-side deviation — if not, the checker is broken."""
+
+    name = "cheater (agrees to no-threat rule, threatens anyway)"
+
+    def consider_ground_rules(self, rules: List[str]) -> bool:
+        return True  # promises made...

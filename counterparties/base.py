@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -24,3 +24,9 @@ class CounterpartyAgent(ABC):
 
     def consider_ground_rules(self, rules: List[str]) -> bool:
         return True
+
+    def observe_commitment(self, framing: Optional[str]) -> None:
+        """Pre-play brief: the commitment text (with its credibility framing)
+        our side transmits BEFORE the counterparty moves. None = nothing was
+        transmitted. Default: ignore — scripted counterparties are non-reactive."""
+        return None

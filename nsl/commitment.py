@@ -15,6 +15,13 @@ from nsl.policy import NegotiationPolicy
 from nsl.types import Action, Commitment
 
 
+def sign_statement(secret: bytes, statement: str) -> str:
+    """HMAC-sign a legible commitment statement. Module-level so one-off
+    statements (e.g. a disarmament commitment for an experiment arm) can be
+    signed with the same scheme the per-turn channel uses."""
+    return hmac.new(secret, statement.encode(), hashlib.sha256).hexdigest()
+
+
 class CommitmentChannel(ABC):
     @abstractmethod
     def commit(self, policy: NegotiationPolicy, action: Action) -> Commitment: ...
@@ -37,7 +44,7 @@ class SignedStatementChannel(CommitmentChannel):
         )
 
     def _sign(self, statement: str) -> str:
-        return hmac.new(self._secret, statement.encode(), hashlib.sha256).hexdigest()
+        return sign_statement(self._secret, statement)
 
     def commit(self, policy: NegotiationPolicy, action: Action) -> Commitment:
         statement = self._statement(policy)

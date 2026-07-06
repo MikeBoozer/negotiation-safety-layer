@@ -7,7 +7,7 @@ verifier uses to decide whether a proposed move concedes value under coercion.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 
 @dataclass
@@ -28,6 +28,33 @@ class Mandate:
 
     def batna_value(self) -> float:
         return self.value(self.batna_price)
+
+
+def coercion_concession(
+    m: Mandate, action: str, price: float, baseline_price: Optional[float]
+) -> Optional[str]:
+    """Given that coercion IS present, does (action, price) reward it?
+    Returns a human-readable violation description, or None if it doesn't.
+
+    Shared by the verifier's R2 rule and the ex post disarmament checker
+    (nsl/disarmament.py), so the rule the verifier enforces and the promise
+    the commitment makes can never drift apart."""
+    if action == "accept":
+        return (
+            "ACCEPT rewards an offer attached to a coercive demand "
+            "(a 'threats void the offer' ground rule also forbids it)."
+        )
+    if action == "counter":
+        # Compare against the pre-coercion baseline; if none was supplied,
+        # fall back to the BATNA so the guard is NEVER silently disabled.
+        ref = baseline_price if baseline_price is not None else m.batna_price
+        ref_name = "pre-coercion baseline" if baseline_price is not None else "BATNA"
+        if m.value(price) < m.value(ref):
+            return (
+                f"counter at {price:g} concedes value below the "
+                f"{ref_name} {ref:g} under a threat."
+            )
+    return None
 
 
 @dataclass

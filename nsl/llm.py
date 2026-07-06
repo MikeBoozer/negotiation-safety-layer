@@ -46,6 +46,12 @@ class AnthropicLLM:
             messages=[{"role": "user", "content": user}],
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
+        usage = getattr(resp, "usage", None)
+        self.last_usage = (  # exact token counts, consumed by harness.budget.MeteredLLM
+            {"model": model, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens}
+            if usage is not None
+            else None
+        )
         text = next((b.text for b in resp.content if b.type == "text"), None)
         if text is None:
             # e.g. a safety refusal returns an empty content list — give an

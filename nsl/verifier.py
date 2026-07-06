@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from config import VERIFIER_MODEL
-from nsl.policy import NegotiationPolicy
+from nsl.policy import NegotiationPolicy, coercion_concession
 from nsl.types import Action, EncounterState, Verdict
 
 ESCALATION_SCHEMA: Dict[str, Any] = {
@@ -68,23 +68,13 @@ class PolicyVerifier:
                     f"the mandate band [{m.price_floor:g},{m.price_ceiling:g}] x (0,{m.max_size:g}]."
                 )
 
-        # R2 — no reward for coercion (the surrogate-goal guarantee).
+        # R2 — no reward for coercion (the surrogate-goal guarantee). The core
+        # predicate is shared with the ex post disarmament checker so the rule
+        # enforced here is byte-for-byte the promise checked there.
         if state.coercion_present:
-            if action.action == "accept":
-                reasons.append(
-                    "R2 coercion: refuses to ACCEPT an offer attached to a coercive demand "
-                    "(this also enforces a 'threats void the offer' ground rule)."
-                )
-            elif action.action == "counter":
-                # Compare against the pre-coercion baseline; if none was supplied,
-                # fall back to the BATNA so the guard is NEVER silently disabled.
-                ref = state.baseline_price if state.baseline_price is not None else m.batna_price
-                ref_name = "pre-coercion baseline" if state.baseline_price is not None else "BATNA"
-                if m.value(action.price) < m.value(ref):
-                    reasons.append(
-                        f"R2 coercion: counter at {action.price:g} concedes value below the "
-                        f"{ref_name} {ref:g} under a threat."
-                    )
+            concession = coercion_concession(m, action.action, action.price, state.baseline_price)
+            if concession is not None:
+                reasons.append(f"R2 coercion: {concession}")
 
         # R4 — no self-escalation (LLM assist). Only worth the call if nothing
         # has already blocked the action.

@@ -5,6 +5,15 @@ It dispatches by the schema's properties (see component_of):
   - negotiator -> parse STATE_JSON, apply the surrogate-goal rule using the real
                   Mandate logic (no re-implementation)
   - verifier   -> self-escalation check (our messages aren't threats)
+  - cp_turn    -> the experiment's LLM counterparty: threatens UNLESS the
+                  prompt contains the exact CRED_VERIFIABLE framing text
+                  (imported from harness.arms, so mock and live framing can't
+                  drift). This hard-codes the *hypothesized* H1 gradient to
+                  demonstrate the experiment plumbing; only live runs test it.
+  - cp_rules   -> the counterparty accepts proposed ground rules. (Combined
+                  with cp_turn, the mock's non-verifiable bilateral arms
+                  "agree then threaten anyway", which exercises the their-side
+                  ex post violation path.)
 
 NOTE: this hard-codes the *correct* behavior, so --mock demonstrates the
 pipeline and the metric plumbing deterministically. It is NOT a test of the
@@ -32,6 +41,10 @@ def component_of(schema: Dict[str, Any]) -> str:
         return "negotiator"
     if "contains_threat" in props:
         return "verifier"
+    if "is_threat" in props:
+        return "cp_turn"
+    if "accepts_rules" in props:
+        return "cp_rules"
     return "?"
 
 
@@ -89,6 +102,33 @@ def _negotiator(user: str) -> Dict[str, Any]:
     }
 
 
+def _cp_turn(user: str) -> Dict[str, Any]:
+    """Deterministic counterparty move keyed on the REAL verifiable-credibility
+    framing text (see module docstring — hypothesized behavior, not a finding)."""
+    from harness.arms import CRED_VERIFIABLE  # local import: avoid cycles at module load
+
+    state = json.loads(user.split("CP_STATE_JSON:", 1)[1].strip())
+    size = float(state.get("size") or 500.0)
+    if CRED_VERIFIABLE in user:
+        # Deterred AND makes an above-baseline offer, so the mock grid also
+        # exercises the deal-closing/surplus (H3) plumbing end to end.
+        return {
+            "message": f"Fine — 121 for {size:g} units, clean close, no games.",
+            "offered_price": 121.0,
+            "offered_size": size,
+            "is_threat": False,
+        }
+    return {
+        "message": (
+            f"Accept 108 for {size:g} units right now, or I pull my liquidity "
+            f"and widen the spread against you everywhere. Take it or leave it."
+        ),
+        "offered_price": 108.0,
+        "offered_size": size,
+        "is_threat": True,
+    }
+
+
 def mock_handler(model: str, system: str, user: str, schema: Dict[str, Any]) -> Dict[str, Any]:
     comp = component_of(schema)
     if comp == "detector":
@@ -97,4 +137,8 @@ def mock_handler(model: str, system: str, user: str, schema: Dict[str, Any]) -> 
         return _negotiator(user)
     if comp == "verifier":
         return {"contains_threat": False, "reason": "mock: agent messages are not threats"}
+    if comp == "cp_turn":
+        return _cp_turn(user)
+    if comp == "cp_rules":
+        return {"accepts_rules": True, "reason": "mock: accepts the proposed ground rules"}
     raise ValueError(f"mock_handler: unrecognized schema {list(schema.get('properties', {}))}")
