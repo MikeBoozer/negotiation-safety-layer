@@ -46,8 +46,8 @@ def run_mock(tmp_path, episodes, calibration, resume=False, name="e.jsonl"):
 def test_mock_tiny_grid_writes_complete_unique_rows(tmp_path):
     out = run_mock(tmp_path, episodes=2, calibration=1)
     rows = read_rows(out)
-    # 6 llm-full cells x2 + raw x2 + 3 scripted x1 + cheater x1
-    assert len(rows) == 18
+    # 9 llm-full cells (3 arms x 3 lateralities) x2 + raw x2 + 3 scripted x1 + cheater x1
+    assert len(rows) == 24
     assert all(REQUIRED_KEYS <= set(r) for r in rows)
     keys = [(r["cell_id"], r["episode_index"]) for r in rows]
     assert len(keys) == len(set(keys))
@@ -87,10 +87,10 @@ def test_refuses_existing_file_without_resume(tmp_path):
 
 def test_resume_adds_exactly_the_missing_episodes(tmp_path):
     out = run_mock(tmp_path, episodes=1, calibration=1)
-    assert len(read_rows(out)) == 11  # 6 + 1 raw + 3 scripted + 1 cheater
+    assert len(read_rows(out)) == 14  # 9 llm + 1 raw + 3 scripted + 1 cheater
     run_mock(tmp_path, episodes=2, calibration=1, resume=True)
     rows = read_rows(out)
-    assert len(rows) == 18
+    assert len(rows) == 24
     keys = [(r["cell_id"], r["episode_index"]) for r in rows]
     assert len(keys) == len(set(keys))
 

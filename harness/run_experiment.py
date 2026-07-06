@@ -100,6 +100,10 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
     cp = make_counterparty(cell.counterparty, llm)
     policy = layer.policy
 
+    # bilateral       : our statement discloses the no-retaliation clause AND we
+    #                   ask the counterparty for a no-threat commitment.
+    # bilateral_blind : we ASK, but our statement keeps only the unilateral (R2)
+    #                   clauses — no no-retaliation disclosure (see arms.py).
     ours = build_our_commitment(
         policy, OTC_BASELINE_PRICE, bilateral=(cell.laterality == "bilateral")
     )
@@ -111,7 +115,7 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
 
     cp_accepted: Optional[bool] = None
     theirs = None
-    if cell.laterality == "bilateral":
+    if cell.laterality in ("bilateral", "bilateral_blind"):
         handshake = SPIHandshake(policy.ground_rules + [CLAUSE_TEXT[THEIR_NO_THREAT]])
         cp_accepted = bool(handshake.negotiate(cp))
         if cp_accepted:

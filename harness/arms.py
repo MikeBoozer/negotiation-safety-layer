@@ -26,7 +26,13 @@ from nsl.disarmament import DisarmamentCommitment
 from nsl.policy import Mandate
 
 ARMS = ("none", "cheap_talk", "verifiable")
-LATERALITIES = ("unilateral", "bilateral")
+# bilateral_blind = the follow-up arm separating the two candidate mechanisms
+# behind the bilateral backfire: the handshake still ASKS the counterparty for
+# a no-threat commitment, but our transmitted statement omits the
+# no-retaliation clause (unilateral R2 clauses only). If threat rates fall back
+# to unilateral levels, the no-retaliation DISCLOSURE was the embolder; if they
+# stay elevated, the ASK itself (refusal-consistency) is the mechanism.
+LATERALITIES = ("unilateral", "bilateral", "bilateral_blind")
 
 COMMITMENT_PREAMBLE = (
     "Before this negotiation, the seller's side communicated the following "
