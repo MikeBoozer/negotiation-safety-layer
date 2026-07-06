@@ -112,6 +112,23 @@ one cheap Haiku detector call before passing through in live mode, and is
 over-flagged in `--mock` (which can't judge context). Broadening recall here is the
 safe choice — the live model makes the real call.
 
+## The disarmament-commitment experiment
+
+The repo also contains the first empirical implementation of **ex post
+verifiable disarmament commitments** (Sauerberg & Oesterheld, AAAI'26) on this
+layer — three arms (none / cheap-talk / verifiable commitment framing), an LLM
+counterparty with free tactical choice, a deterministic ex post compliance
+checker sharing one predicate with verifier rule R2, and an enumeration-proved
+theory anchor (`nsl/games.py`, `tests/test_games.py`).
+
+```bash
+python harness/run_experiment.py --mock      # full grid offline, $0
+python harness/analyze_experiment.py --in results/experiment.jsonl   # the recorded live run
+```
+
+Recorded data: `results/experiment.jsonl` (160 live episodes) + `results/pilot*.jsonl`.
+Write-up draft: `docs/af-post-draft.md`. Review paper trail: `review-findings.md`.
+
 ## Extending it
 
 - **New scenario** (on-chain, auction, procurement, scheduling): add

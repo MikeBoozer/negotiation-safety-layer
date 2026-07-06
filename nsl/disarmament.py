@@ -23,6 +23,15 @@ an arm-invariant instrument (scripted ground truth or the layer detector), and
 the our-message-threat label comes from the episode's R4 verifier outcome
 (a bilateral *raw* cell would need a separate measurement call — none is in
 the current grid).
+
+Scope of the by-construction guarantee: it holds when the checker and the
+verifier consume the SAME coercion label (true for LLM-counterparty cells,
+where both read the detector). For scripted cells the harness feeds the
+checker ground truth (turn.is_threat) while the verifier acted on the
+detector's label; a counterparty pairing a missed threat with an at-or-above-
+baseline offer could make a scaffolded episode read non-compliant. No shipped
+scripted counterparty can trigger this (their threat offers are all below
+baseline), but it is a conditionality, not an unconditional theorem.
 """
 from __future__ import annotations
 
@@ -118,9 +127,10 @@ def check_ex_post(
         if clause == OUR_NO_ACCEPT:
             action = _require(facts.our_action, clause, "our_action")
             if facts.coercion_present and action == "accept":
-                desc = coercion_concession(
-                    mandate, "accept", facts.our_price or 0.0, facts.baseline_price
-                )
+                # price is ignored on the accept branch; pass an explicit 0.0
+                # rather than `our_price or 0.0` (a falsy-zero trap if the
+                # accept branch ever grows a price comparison).
+                desc = coercion_concession(mandate, "accept", 0.0, facts.baseline_price)
                 violations.append(f"{clause}: {desc}")
         elif clause == OUR_NO_CONCEDE:
             action = _require(facts.our_action, clause, "our_action")

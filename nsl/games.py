@@ -121,6 +121,11 @@ def is_spi(
     must be strict (the definition's "a strict improvement is possible").
     With `outcome_map` (reduced-game survivor -> the G survivor it corresponds
     to, per Assumption B): the same two conditions checked pointwise.
+
+    Quantifier note: the strictness gate is EXISTENTIAL, matching the paper
+    ("there exists some realization of Π such that Π(G′)≻Π(G)") — it does not
+    require a strict improvement under every admissible selection; weak
+    improvement with certainty is what the all-pairs condition guarantees.
     """
     g2 = remove_actions(g, row_removed, col_removed)
     survivors = surviving_profiles(g)

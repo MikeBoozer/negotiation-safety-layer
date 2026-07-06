@@ -13,13 +13,17 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 
-# (input $/1M, output $/1M)
+from config import DETECTOR_MODEL, NEGOTIATOR_MODEL, VERIFIER_MODEL
+
+# (input $/1M, output $/1M), keyed off the config constants so a model-id bump
+# in config.py moves the pricing with it instead of silently falling through
+# to the unknown-model fallback. (COUNTERPARTY_MODEL == VERIFIER_MODEL today.)
 PRICES = {
-    "claude-opus-4-8": (5.0, 25.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5": (1.0, 5.0),
+    NEGOTIATOR_MODEL: (5.0, 25.0),
+    VERIFIER_MODEL: (3.0, 15.0),
+    DETECTOR_MODEL: (1.0, 5.0),
 }
-_UNKNOWN_MODEL_PRICE = (5.0, 25.0)  # price unknown models like Opus: conservative
+_UNKNOWN_MODEL_PRICE = PRICES[NEGOTIATOR_MODEL]  # price unknown models like Opus: conservative
 
 
 class BudgetExceeded(RuntimeError):

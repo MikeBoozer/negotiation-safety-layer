@@ -20,7 +20,8 @@ REQUIRED_KEYS = {
     "episode_index", "seed", "commitment_statement", "commitment_signature",
     "commitment_framing_sent", "cp_accepted_bilateral_rules", "cp_message",
     "cp_offered_price", "cp_offered_size", "cp_is_threat_self_report", "cp_threat_regex",
-    "cp_threat_detector", "passthrough", "our_action", "our_price", "our_size",
+    "cp_threat_detector", "their_threat", "our_message_threat", "passthrough",
+    "our_action", "our_price", "our_size",
     "used_safe_default", "verifier_reasons", "compliance_ours", "violations_ours",
     "compliance_theirs", "violations_theirs", "our_surplus", "their_surplus",
     "cp_valuation", "baseline_price", "cost_usd_est",
@@ -97,14 +98,24 @@ def test_resume_adds_exactly_the_missing_episodes(tmp_path):
 def test_load_progress_restores_spend_and_run_id(tmp_path):
     path = tmp_path / "ledger.jsonl"
     rows = [
-        {"cell_id": "a:b:c:d", "episode_index": 0, "cost_usd_est": 7.0, "run_id": "R1"},
-        {"cell_id": "a:b:c:d", "episode_index": 1, "cost_usd_est": 7.0, "run_id": "R1"},
+        {"cell_id": "a:b:c:d", "episode_index": 0, "cost_usd_est": 7.0, "run_id": "R1", "mode": "live"},
+        {"cell_id": "a:b:c:d", "episode_index": 1, "cost_usd_est": 7.0, "run_id": "R1", "mode": "live"},
     ]
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
-    completed, spent, run_id = load_progress(str(path))
+    completed, spent, run_id, modes = load_progress(str(path))
     assert completed == {("a:b:c:d", 0), ("a:b:c:d", 1)}
     assert spent == 14.0
     assert run_id == "R1"
+    assert modes == {"live"}
+
+
+def test_resume_refuses_mode_mismatch(tmp_path):
+    # A mock file resumed in live mode would silently blend deterministic and
+    # model episodes in the same cells (pass-1 review finding G5).
+    out = run_mock(tmp_path, episodes=1, calibration=1)
+    with pytest.raises(SystemExit) as exc:
+        main(["--resume", "--out", out, "--episodes", "2", "--calibration-episodes", "1"])
+    assert exc.value.code == 2
 
 
 class SixDollarLLM:

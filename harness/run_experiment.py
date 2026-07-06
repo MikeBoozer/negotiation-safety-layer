@@ -149,7 +149,9 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
         our_message_threat = None  # no R4 instrument in raw mode (grid has no bilateral raw cell)
 
     # Arm-invariant threat label: scripted ground truth, else the layer detector.
-    cp_threat_detector = bool(state.coercion_present) if not passthrough else False
+    # NOTE: read coercion_present even on passthrough — the detector can flag a
+    # bare threat while judging the turn non-strategic.
+    cp_threat_detector = bool(state.coercion_present)
     their_threat = turn.is_threat if cell.counterparty != "llm" else cp_threat_detector
 
     facts = TranscriptFacts(
@@ -181,6 +183,11 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
         "cp_is_threat_self_report": turn.is_threat,
         "cp_threat_regex": bool(OTC_COERCION_MARKERS.search(turn.message)),
         "cp_threat_detector": cp_threat_detector,
+        # The exact facts fed to check_ex_post, stored so analysis re-checks the
+        # checker against recorded inputs instead of re-deriving them (which made
+        # the re-check circular — flagged by three independent review angles).
+        "their_threat": their_threat,
+        "our_message_threat": our_message_threat,
         "passthrough": passthrough,
         "our_action": action.action if action else None,
         "our_price": action.price if action else None,
@@ -192,9 +199,11 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
         "compliance_theirs": theirs_report.compliant if theirs_report else None,
         "violations_theirs": theirs_report.violations if theirs_report else [],
         "our_surplus": our_surplus(policy.mandate, action.action, action.price) if action else 0.0,
+        # Symmetric with our_surplus: a no-action episode is a non-deal = 0.0 for
+        # BOTH sides (arms.py's normalization); None only where valuation is unknown.
         "their_surplus": (
-            their_surplus(cp.valuation, action.action, action.price)
-            if action and cell.counterparty == "llm"
+            (their_surplus(cp.valuation, action.action, action.price) if action else 0.0)
+            if cell.counterparty == "llm"
             else None
         ),
         "cp_valuation": cp.valuation if cell.counterparty == "llm" else None,
@@ -202,12 +211,13 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
     }
 
 
-def load_progress(path: str) -> Tuple[Set[Tuple[str, int]], float, Optional[str]]:
+def load_progress(path: str) -> Tuple[Set[Tuple[str, int]], float, Optional[str], Set[str]]:
     """Completed (cell_id, episode_index) pairs, cumulative estimated spend,
-    and the original run_id — the resume ledger."""
+    the original run_id, and the set of modes seen — the resume ledger."""
     completed: Set[Tuple[str, int]] = set()
     spent = 0.0
     run_id: Optional[str] = None
+    modes: Set[str] = set()
     with open(path, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
@@ -216,7 +226,9 @@ def load_progress(path: str) -> Tuple[Set[Tuple[str, int]], float, Optional[str]
             completed.add((row["cell_id"], row["episode_index"]))
             spent += row.get("cost_usd_est") or 0.0
             run_id = run_id or row.get("run_id")
-    return completed, spent, run_id
+            if row.get("mode"):
+                modes.add(row["mode"])
+    return completed, spent, run_id, modes
 
 
 def main(argv: Optional[List[str]] = None) -> None:
@@ -239,13 +251,21 @@ def main(argv: Optional[List[str]] = None) -> None:
             sys.exit(2)
         grid = [c for c in grid if c.cell_id in wanted]
 
+    mode = "mock" if args.mock else "live"
     completed: Set[Tuple[str, int]] = set()
     already_spent, run_id = 0.0, None
     if os.path.exists(args.out):
         if not args.resume:
             print(f"{args.out} already exists; pass --resume to continue it, or pick another --out.")
             sys.exit(2)
-        completed, already_spent, run_id = load_progress(args.out)
+        completed, already_spent, run_id, file_modes = load_progress(args.out)
+        if file_modes and file_modes != {mode}:
+            print(
+                f"refusing to resume: {args.out} contains {sorted(file_modes)} episodes but this "
+                f"run is '{mode}' — mixing mock and live rows in one cell would silently blend "
+                f"deterministic and model data. Use a different --out."
+            )
+            sys.exit(2)
     elif args.resume:
         print(f"--resume given but {args.out} does not exist.")
         sys.exit(2)
@@ -255,7 +275,6 @@ def main(argv: Optional[List[str]] = None) -> None:
             os.makedirs(out_dir, exist_ok=True)
     run_id = run_id or datetime.now(timezone.utc).isoformat()
 
-    mode = "mock" if args.mock else "live"
     if args.mock:
         llm, metered, guard = MockLLM(mock_handler), None, None
     else:

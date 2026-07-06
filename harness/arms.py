@@ -13,8 +13,10 @@ the framing the live model sees.
 
 Surplus accounting caveat (single-turn game): only OUR 'accept' closes a deal;
 counters never resolve in a one-exchange episode, so non-deals are normalized
-to the outside option = 0 surplus for both sides. H3 comparisons are therefore
-about realized-deal surplus distributions, not full bargaining paths.
+to the outside option = 0 surplus for both sides. The per-episode surplus
+recorded here is therefore an EXPECTED surplus (deal frequency x deal quality);
+the analyzer additionally reports realized surplus per closed deal so the two
+are never conflated (pass-1 review finding G2).
 """
 from __future__ import annotations
 
