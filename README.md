@@ -6,6 +6,8 @@ A runnable prototype of a **negotiation-safety layer**: middleware that wraps a
 delegate agent in a strategic interaction so it **refuses to reward coercion**,
 **still closes good deals**, and **leaves ordinary work untouched**.
 
+📄 **The write-up — [*Do verifiable commitments beat cheap talk?*](docs/writeup.md) — is the main read:** the experiment, full results, and limitations. Code and every recorded episode are in this repo.
+
 It operationalizes two ideas from the cooperative-AI literature:
 
 - **Surrogate goals** — Oesterheld, Riché, Sondej, Clifton & Conitzer (2026),
@@ -127,7 +129,7 @@ python harness/analyze_experiment.py --in results/experiment.jsonl   # the recor
 ```
 
 Recorded data: `results/experiment.jsonl` (160 live episodes) + `results/pilot*.jsonl`.
-Write-up: `docs/writeup.md`. Review paper trail: `review-findings.md`.
+Write-up: [`docs/writeup.md`](docs/writeup.md). Review paper trail: [`review-findings.md`](review-findings.md).
 
 ## Extending it
 
