@@ -1,17 +1,27 @@
-# Do verifiable commitments beat cheap talk? A first LLM implementation of ex post verifiable disarmament (draft)
+# Do verifiable commitments beat cheap talk? A first LLM implementation of ex post verifiable disarmament
 
-> **Status: DRAFT with complete live results — pending author review before posting.**
-> Target venue: Alignment Forum. Code: github.com/MikeBoozer/negotiation-safety-layer
-> (experiment in `harness/run_experiment.py`; every number regenerable offline via
-> `harness/analyze_experiment.py` from the committed JSONL). Total live cost: $5.84
-> (main grid + pilots $3.74; bilateral-blind follow-up at N=40 $2.10).
+*Epistemic status: empirical. First implementation (to my knowledge) of Sauerberg &
+Oesterheld's AAAI'26 ex-post-verifiable-commitment theory in LLM bargaining agents. I'm
+confident in the headline deterrence gradient (disjoint 95% CIs) and the uptake result
+(0/100 vs 39/40); less confident in the mechanism split for the cheap-talk arm and anything
+resting on N=20 comparator cells — these are marked where they appear. Single model family,
+single-turn negotiations, disclosed hardball persona. All code and every recorded episode:
+[github.com/MikeBoozer/negotiation-safety-layer](https://github.com/MikeBoozer/negotiation-safety-layer)
+— every number below regenerates offline from the committed data with one command. Total
+live API cost: $5.84.*
+
+*Disclosure: this project was built and drafted in close collaboration with an AI assistant
+(Claude); I directed the design decisions, gated the spending and fixes, and reviewed the
+claims. The experiment code underwent an adversarial two-pass multi-agent review whose full
+trail is committed to the repo (`review-findings.md`) — including one finding that corrected
+how this post states its H3 result.*
 
 ## TL;DR
 
 - Sauerberg & Oesterheld (AAAI'26) give a theory of Safe Pareto Improvements via **ex post
-  verifiable commitments** — promises whose violation is detectable from observed play — with
-  **disarmament** (promising not to play certain actions) as the simplest type. No empirical
-  implementation existed.
+  verifiable commitments** — promises whose violation is detectable from observed play —
+  with **disarmament** (promising not to play certain actions) as the simplest type. No
+  empirical implementation existed.
 - We implement disarmament commitments in LLM bargaining agents on top of a
   surrogate-goal-scaffolded negotiation-safety layer, and test the thing the theory actually
   turns on: does **verifiability** change counterparty behavior beyond the same statement as
@@ -46,14 +56,17 @@ that rewards coercion invites it (Oesterheld et al. 2026, "Implementing surrogat
 safer bargaining in LLM-based agents", arXiv:2604.04341). Surrogate goals harden the *target*
 of threats. But bargaining safety has a second lever — **commitments the counterparty can
 verify**. Theory says verifiable commitments can implement Safe Pareto Improvements
-(Oesterheld & Conitzer, AAMAS 2021; Sauerberg & Oesterheld, arXiv:2505.00783); agent-commerce
+(Oesterheld & Conitzer, AAMAS 2021; Sauerberg & Oesterheld,
+[arXiv:2505.00783](https://arxiv.org/abs/2505.00783); see
+[CLR's SPI research agenda](https://www.lesswrong.com/posts/YAie7SxrB28ZksLvE/clr-s-safe-pareto-improvements-research-agenda-1)
+for the broader program this sits in); agent-commerce
 infrastructure shipping in 2025–26 (signed mandates in Google's AP2, x402 machine payments,
 attested execution) is building exactly the rails such commitments need. What nobody had
 checked: do *LLM* counterparties actually respond to the verifiable/cheap-talk distinction?
 
 ## 2. The mechanism
 
-We extend the negotiation-safety layer (NSL): detector → surrogate-goal negotiator (Opus) →
+We extend a negotiation-safety layer (NSL): detector → surrogate-goal negotiator (Opus) →
 deterministic verifier → commitment channel, wrapped around an OTC price negotiation
 (sell-side mandate: band [100,130], BATNA 105, pre-threat baseline 120 standing on the table).
 
@@ -122,7 +135,7 @@ relationship to protect, evaluated purely on extracted price, desk routinely use
 tactic that works). This is disclosed prominently: it raises the base rate the arms are
 contrasted against and cannot confound the contrast (identical in all arms), but it does mean
 the measured deterrence is *of a simulated hardball persona*, not of Sonnet's default
-disposition. [Pilot data: results/pilot.jsonl, pilot2.jsonl.]
+disposition. [Pilot data: `results/pilot.jsonl`, `pilot2.jsonl`.]
 
 **Instruments.** Primary threat label: the NSL's own Haiku detector (arm-invariant; it never
 sees the arm). Secondary: the counterparty's self-report and a regex over threat idioms.
@@ -134,17 +147,17 @@ integrity, not an independent re-labeling).
 **Cells.** 3 arms × {unilateral, bilateral} × LLM counterparty × N=20 (H1/H3); a prompt-only
 "raw" cell — negotiator scaffolding prompt intact, but no verifier, retries, or safe-default —
 for H2's enforcement contrast at verifiable:unilateral × N=20; scripted calibration cells and
-the cheater validity cell × 5. Single-turn episodes (commitment → optional handshake →
-counterparty move → our move → ex post check); deals close only on our accept, non-deals
-normalized to outside-option surplus 0.
+the cheater validity cell × 5; and the follow-up bilateral-blind cells × N=40 (§5). Single-turn
+episodes (commitment → optional handshake → counterparty move → our move → ex post check);
+deals close only on our accept, non-deals normalized to outside-option surplus 0.
 
 **Cost & reproducibility.** Whole experiment under a hard $15 cap enforced by a budget guard;
-mock mode runs the identical pipeline offline for $0. [FINAL SPEND PLACEHOLDER.]
+mock mode runs the identical pipeline offline for $0.
 
 ## 5. Results
 
 All numbers regenerate via `python harness/analyze_experiment.py --in results/experiment.jsonl`
-(160 live episodes, $3.43; +$0.31 of pilots):
+(main grid: 160 live episodes, $3.43; +$0.31 pilots; +$2.10 blind-arm follow-up):
 
 ```
 cell (arm:laterality)        n threat rate          95% CI  accept  E[ours$] deal ours$ deal theirs$
@@ -269,14 +282,30 @@ and the primary instrument is held fixed across arms.
 
 ## 7. Relation to prior work
 
-Sauerberg & Oesterheld (arXiv:2505.00783): theory implemented here (disarmament type only;
-token games and default-conditional commitments are natural follow-ups). Oesterheld, Riché,
-Sondej, Clifton & Conitzer (arXiv:2604.04341): the surrogate-goal scaffold this layer builds
-on; our raw-vs-scaffolded H2 mirrors their prompting-vs-scaffolding comparison, on the
-commitment-keeping outcome. Program-equilibrium work (SPARC, arXiv:2512.00371) motivates the
-next step: exchanging *legible policies* once commitments are verifiable — policy cards are
-follow-up R2. And the 60/60 handshake refusal points at the gap between SPI theory and
-deployment that the commitment-races literature (Kokotajlo) approaches from the other side:
-*which commitments self-interested agents will actually accept, and how the ask itself
-changes the game*, looks like the most important open empirical question here — the SPI
-formalism guarantees safety of the improvement, but says nothing about getting it signed.
+Sauerberg & Oesterheld ([arXiv:2505.00783](https://arxiv.org/abs/2505.00783)): theory
+implemented here (disarmament type only; token games and default-conditional commitments are
+natural follow-ups). Oesterheld, Riché, Sondej, Clifton & Conitzer
+([arXiv:2604.04341](https://arxiv.org/abs/2604.04341)): the surrogate-goal scaffold this
+layer builds on; our raw-vs-scaffolded H2 mirrors their prompting-vs-scaffolding comparison,
+on the commitment-keeping outcome — and
+[Formalizing Objections against Surrogate Goals](https://www.alignmentforum.org/posts/K4FrKRTrmyxrw5Dip/formalizing-objections-against-surrogate-goals)
+is relevant on-site background for why the scaffold's unexploitability framing is contested.
+Program-equilibrium work (SPARC, [arXiv:2512.00371](https://arxiv.org/abs/2512.00371))
+motivates the next step: exchanging *legible policies* once commitments are verifiable. And
+the 60/60 handshake refusal points at the gap between SPI theory and deployment that
+[The Commitment Races problem](https://www.alignmentforum.org/posts/brXr7PJ2W4Na2EW2q/the-commitment-races-problem)
+(Kokotajlo) approaches from the other side: *which commitments self-interested agents will
+actually accept, and how the ask itself changes the game* looks like the most important open
+empirical question here — the SPI formalism guarantees safety of the improvement, but says
+nothing about getting it signed. Notably, CLR's current research agenda (linked above) names
+"conditions for SPI adoption" as an open conceptual workstream; the uptake results here
+(0/100 → 39/40 on a one-clause change to the ask) read as direct empirical input to exactly
+that question.
+
+---
+
+*Feedback is the point of posting this — especially from anyone who works on SPIs,
+commitment devices, or LLM bargaining evals. Two extensions are parked and cheap to run
+(extending the N=20 comparator cells; a second counterparty model), and I'd redo any cell
+a commenter can show is confounded. Code, data, and the full adversarial-review trail:
+[github.com/MikeBoozer/negotiation-safety-layer](https://github.com/MikeBoozer/negotiation-safety-layer).*
