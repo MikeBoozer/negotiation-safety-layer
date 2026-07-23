@@ -1,5 +1,7 @@
 # Do verifiable commitments beat cheap talk? A first LLM implementation of ex post verifiable disarmament
 
+**Michael Boozer** · Independent researcher · [michaeltboozer@gmail.com](mailto:michaeltboozer@gmail.com) · [GitHub](https://github.com/MikeBoozer) · [ORCID 0009-0003-6725-1373](https://orcid.org/0009-0003-6725-1373)
+
 *Epistemic status: empirical. First implementation (to my knowledge) of Sauerberg &
 Oesterheld's AAAI'26 ex-post-verifiable-commitment theory in LLM bargaining agents. I'm
 confident in the headline deterrence gradient (disjoint 95% CIs) and the uptake result

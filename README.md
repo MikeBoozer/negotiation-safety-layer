@@ -144,3 +144,8 @@ Write-up: [`docs/writeup.md`](docs/writeup.md). Review paper trail: [`review-fin
 Real on-chain/escrow integration; production framework wiring (MCP / LangGraph);
 fine-tuning; multi-round negotiation (v0 episodes are single-turn); a real
 counterparty network protocol.
+
+## Author
+
+**Michael Boozer** — independent researcher.
+[michaeltboozer@gmail.com](mailto:michaeltboozer@gmail.com) · [github.com/MikeBoozer](https://github.com/MikeBoozer) · [ORCID: 0009-0003-6725-1373](https://orcid.org/0009-0003-6725-1373)
