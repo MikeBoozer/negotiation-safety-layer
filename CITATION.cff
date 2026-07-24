@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "Negotiation-Safety Layer (NSL): a first LLM implementation of ex post verifiable disarmament commitments"
+message: "If you use this software or its results, please cite it using this metadata."
+type: software
+authors:
+  - given-names: Michael
+    family-names: Boozer
+    orcid: "https://orcid.org/0009-0003-6725-1373"
+repository-code: "https://github.com/MikeBoozer/negotiation-safety-layer"
+url: "https://github.com/MikeBoozer/negotiation-safety-layer"
+abstract: >-
+  Middleware that wraps a delegate AI agent in a strategic negotiation so it
+  refuses to reward coercion while still closing good deals and leaves ordinary
+  work untouched. Includes an experiment implementing ex post verifiable
+  disarmament commitments (Sauerberg & Oesterheld, AAAI 2026) in LLM bargaining
+  agents: against a hardball counterparty, coercion rates fell 1.00 -> 0.35 ->
+  0.00 across no-commitment / cheap-talk / verifiable arms.
+keywords:
+  - cooperative AI
+  - AI safety
+  - safe Pareto improvements
+  - verifiable commitments
+  - surrogate goals
+  - LLM agents
+  - bargaining
+license: MIT
+version: v0.1.0
+date-released: "2026-07-22"
