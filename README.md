@@ -1,6 +1,7 @@
 # Negotiation-Safety Layer (NSL) — v0
 
 [![CI](https://github.com/MikeBoozer/negotiation-safety-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBoozer/negotiation-safety-layer/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/1284630348.svg)](https://doi.org/10.5281/zenodo.21522306)
 
 A runnable prototype of a **negotiation-safety layer**: middleware that wraps a
 delegate agent in a strategic interaction so it **refuses to reward coercion**,

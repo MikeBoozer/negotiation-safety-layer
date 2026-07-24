@@ -25,4 +25,9 @@ keywords:
   - bargaining
 license: MIT
 version: v0.1.0
-date-released: "2026-07-22"
+date-released: "2026-07-24"
+doi: 10.5281/zenodo.21522306
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21522307"
+    description: "Version DOI for v0.1.0 (the all-versions concept DOI is in the doi field above)"
