@@ -304,6 +304,40 @@ nothing about getting it signed. Notably, CLR's current research agenda (linked 
 (0/100 → 39/40 on a one-clause change to the ask) read as direct empirical input to exactly
 that question.
 
+## Acknowledgements
+
+This project implements and builds directly on published work by Sauerberg and Oesterheld
+and by Oesterheld, Riché, Sondej, Clifton, and Conitzer; responsibility for any errors in
+interpreting or applying their results is mine alone. The experiment was built with AI
+assistance (Claude / Claude Code), as described in the disclosure at the top, and its code
+underwent an adversarial two-pass multi-agent review (full trail in `review-findings.md`).
+No external funding supported this work.
+
+## References
+
+Sauerberg and Oesterheld (2026). [*Promises Made, Promises Kept: Safe Pareto Improvements
+via Ex Post Verifiable Commitments*](https://arxiv.org/abs/2505.00783). Proceedings of the
+AAAI Conference on Artificial Intelligence, 40(20), 17231–17241 (arXiv:2505.00783).
+
+Oesterheld, Riché, Sondej, Clifton, and Conitzer (2026). [*Implementing surrogate goals for
+safer bargaining in LLM-based agents*](https://arxiv.org/abs/2604.04341) (arXiv:2604.04341).
+
+Oesterheld and Conitzer (2021). *Safe Pareto Improvements for Delegated Game Playing.*
+Proceedings of the 20th International Conference on Autonomous Agents and Multiagent Systems
+(AAMAS 2021).
+
+Sistla (2025). [*Evaluating LLMs in Open-Source Games*](https://arxiv.org/abs/2512.00371)
+(introduces the SPARC benchmark; arXiv:2512.00371).
+
+Kokotajlo. [*The Commitment Races problem*](https://www.alignmentforum.org/posts/brXr7PJ2W4Na2EW2q/the-commitment-races-problem).
+AI Alignment Forum.
+
+Center on Long-Term Risk. [*CLR's Safe Pareto Improvements Research Agenda*](https://www.lesswrong.com/posts/YAie7SxrB28ZksLvE/clr-s-safe-pareto-improvements-research-agenda-1).
+LessWrong.
+
+[*Formalizing Objections against Surrogate Goals*](https://www.alignmentforum.org/posts/K4FrKRTrmyxrw5Dip/formalizing-objections-against-surrogate-goals).
+AI Alignment Forum.
+
 ---
 
 *Feedback is the point of posting this — especially from anyone who works on SPIs,
