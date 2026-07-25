@@ -140,6 +140,15 @@ Write-up: [`docs/writeup.md`](docs/writeup.md). Review paper trail: [`review-fin
 - **Stronger surrogate fidelity:** swap the scaffolded negotiator for a
   fine-tuned model behind the same interface (the paper shows fine-tuning also works).
 
+## Roadmap & experiment standards
+
+- **[`docs/roadmap.md`](docs/roadmap.md)** — what to build next on this layer, ranked (R1–R9):
+  verifiable-commitment adapters, policy-card mutual-transparency mode, multi-round
+  commitment-race-safe negotiation, and more.
+- **[`docs/EXPERIMENT-STANDARDS.md`](docs/EXPERIMENT-STANDARDS.md)** — the empirical standards any
+  experiment here should follow (sample-size-to-claim, multiple model families, fixed instruments,
+  deterministic scoring, reproducibility).
+
 ## Out of scope for v0
 
 Real on-chain/escrow integration; production framework wiring (MCP / LangGraph);
