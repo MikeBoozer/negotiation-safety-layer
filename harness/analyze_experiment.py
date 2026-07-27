@@ -17,8 +17,9 @@ unilateral cells, reporting its exclusions explicitly. Validity: the cheater
 cell's detection rate (want 1.000) and a re-check of every row's compliance
 verdict via nsl.disarmament.check_ex_post (want 0 mismatches).
 
-CONTRASTS: every comparison the write-up asserts gets a two-sided Fisher exact
-p-value, computed here rather than typed into the prose, so a reader can check
+CONTRASTS: every comparison the write-up asserts gets a two-sided exact p-value
+(Fisher, except the combined H3 row which is a stratified exact conditional test),
+computed here rather than typed into the prose, so a reader can check
 the inference and not just the rates. Wilson-interval disjointness is a
 conservative eyeball test, not a hypothesis test; where the two disagree the
 p-value is what the claim must answer to. Contrasts are emitted only when both
@@ -44,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import os
 import sys
 from typing import Dict, List, Optional, Tuple
@@ -96,9 +98,46 @@ def fisher_exact(a: int, b: int, c: int, d: int) -> float:
 
     observed = prob(a)
     lo, hi = max(0, c1 - (n - r1)), min(r1, c1)
-    # 1e-12 slack: ties must count, and equal-probability tables can differ in
-    # the last bits after the binomial division.
-    return min(1.0, sum(p for x in range(lo, hi + 1) if (p := prob(x)) <= observed + 1e-12))
+    # RELATIVE tie tolerance. An absolute slack (`<= observed + 1e-12`) is a bug
+    # whenever the observed table's own probability is near or below the slack:
+    # every table under the slack is then swept in, including ones STRICTLY MORE
+    # likely than observed. It silently inflated the uptake contrast from 5.7e-34
+    # to 5.95e-13 — the entire returned value was spurious. Caught by a code
+    # review; regression-tested in tests/test_analyze_experiment.py.
+    return min(1.0, sum(p for x in range(lo, hi + 1) if (p := prob(x)) <= observed * (1 + 1e-7)))
+
+
+def stratified_exact(tables: List[Tuple[int, int, int, int]]) -> float:
+    """Two-sided exact conditional p for several 2x2 strata sharing one effect.
+
+    Convolves the per-stratum hypergeometric null distributions and sums the
+    tail by the same relative-probability rule as `fisher_exact`. This is the
+    analysis that matches a stratified design; pooling the strata into one 2x2
+    discards the stratification and, here, is conservative.
+
+    Preferred over Cochran–Mantel–Haenszel at these cell sizes because a zero
+    cell (verifiable:unilateral is 0/20) makes CMH's chi-square approximation
+    unreliable, while the exact convolution handles it without special-casing.
+    """
+    dist: Dict[int, float] = {0: 1.0}
+    observed = 0
+    for a, b, c, d in tables:
+        r1, r2, c1 = a + b, c + d, a + c
+        n = r1 + r2
+        lo, hi = max(0, c1 - r2), min(r1, c1)
+        stratum = {
+            x: math.comb(r1, x) * math.comb(r2, c1 - x) / math.comb(n, c1)
+            for x in range(lo, hi + 1)
+        }
+        merged: Dict[int, float] = {}
+        for total, p_total in dist.items():
+            for x, p_x in stratum.items():
+                merged[total + x] = merged.get(total + x, 0.0) + p_total * p_x
+        dist = merged
+        observed += a
+
+    p_observed = dist[observed]
+    return min(1.0, sum(p for p in dist.values() if p <= p_observed * (1 + 1e-7)))
 
 
 def _counts(rows: List[dict], key: str, value=True) -> Tuple[int, int]:
@@ -165,6 +204,54 @@ def rederive_compliance_mismatches(rows: List[dict]) -> int:
     return mismatches
 
 
+def power_two_proportions(
+    p_left: float, p_right: float, n: int, alpha: float = 0.05, trials: int = 40000, seed: int = 0
+) -> float:
+    """Simulated power for a two-sided Fisher exact test at n per arm.
+
+    Seeded, so it regenerates exactly. Exists because the write-up quotes a
+    minimum-detectable-N for the H2 contrast, and a number quoted in the prose
+    that no committed code produces is precisely the reproducibility gap these
+    experiments are supposed to close (see EXPERIMENT-STANDARDS.md, standard 3b).
+
+    `trials` defaults high on purpose. At 4000 draws the Monte-Carlo SE is
+    ~0.006, and the H2 curve crosses 0.80 at n=150 with true power ~0.812 —
+    under two SE above the threshold, so `min_n_for_power` returned 150 on
+    seed 0 but 200 on seed 1. A published figure that depends on the seed is
+    not reproducible in any sense worth the name; 40000 draws costs ~1s and
+    makes the answer stable across seeds.
+    """
+    rng = random.Random(seed)
+    hits = 0
+    for _ in range(trials):
+        k_left = sum(1 for _ in range(n) if rng.random() < p_left)
+        k_right = sum(1 for _ in range(n) if rng.random() < p_right)
+        if fisher_exact(k_left, n - k_left, k_right, n - k_right) < alpha:
+            hits += 1
+    return hits / trials
+
+
+def min_n_for_power(
+    p_left: float,
+    p_right: float,
+    target: float = 0.80,
+    candidates: Tuple[int, ...] = (50, 100, 150, 200, 300),
+    **kwargs,
+) -> Optional[int]:
+    """Smallest n per arm from `candidates` reaching `target` power. None if none do.
+
+    `kwargs` (alpha / trials / seed) forward to `power_two_proportions` so the
+    simulation can be tightened or re-seeded without editing a default — the
+    lack of that pass-through is what made the published figure seed-dependent.
+    Threshold-crossing statistics are unstable near the boundary by nature, so
+    prefer quoting the power *at* an n alongside this.
+    """
+    return next(
+        (n for n in candidates if power_two_proportions(p_left, p_right, n, **kwargs) >= target),
+        None,
+    )
+
+
 def _cell_rows(rows: List[dict], arm: str, lat: str, scaffold: str = "full") -> List[dict]:
     return [
         r
@@ -177,7 +264,9 @@ def _cell_rows(rows: List[dict], arm: str, lat: str, scaffold: str = "full") -> 
 
 
 def contrasts(rows: List[dict]) -> List[dict]:
-    """Two-sided Fisher exact p for every comparison the write-up asserts.
+    """Two-sided exact p for every comparison the write-up asserts.
+
+    Fisher for single 2x2 tables; the combined H3 row uses `stratified_exact`.
 
     Each entry names the claim it adjudicates, so a claim that loses its
     p-value cannot quietly stay in the prose. Emitted only when both cells are
@@ -234,14 +323,51 @@ def contrasts(rows: List[dict]) -> List[dict]:
             _cell_rows(rows, arm, "bilateral"),
             key,
         )
-    add(
-        "H3 backfire (pooled)",
-        "uni (ct+v)",
-        _cell_rows(rows, "cheap_talk", "unilateral") + _cell_rows(rows, "verifiable", "unilateral"),
-        "bilateral (ct+v)",
-        _cell_rows(rows, "cheap_talk", "bilateral") + _cell_rows(rows, "verifiable", "bilateral"),
-        key,
-    )
+    # Combining the two measurable arms: pooling into one 2x2 discards the
+    # stratification the design built in, and is conservative. The stratified
+    # exact test is the design-matched analysis; both are emitted so a reader
+    # can see the pooled number the earlier draft quoted and why it changed.
+    strata: List[Tuple[int, int, int, int]] = []
+    for arm in ("cheap_talk", "verifiable"):
+        u, nu = _counts(_cell_rows(rows, arm, "unilateral"), key)
+        b, nb = _counts(_cell_rows(rows, arm, "bilateral"), key)
+        if nu and nb:
+            strata.append((u, nu - u, b, nb - b))
+    if len(strata) >= 2:
+        add(
+            "H3 backfire (pooled)",
+            "uni (ct+v)",
+            _cell_rows(rows, "cheap_talk", "unilateral")
+            + _cell_rows(rows, "verifiable", "unilateral"),
+            "bilateral (ct+v)",
+            _cell_rows(rows, "cheap_talk", "bilateral")
+            + _cell_rows(rows, "verifiable", "bilateral"),
+            key,
+        )
+        lu = sum(t[0] for t in strata)
+        nu = sum(t[0] + t[1] for t in strata)
+        lb = sum(t[2] for t in strata)
+        nb = sum(t[2] + t[3] for t in strata)
+        # The totals below are NOT the table the p-value is computed from — a
+        # reader who runs Fisher on 7/40 vs 18/40 gets the pooled 0.015 in the
+        # row above, not this 0.0061. `detail` prints the actual strata so the
+        # inference is checkable, which is the whole point of this table.
+        detail = "strata " + " ".join(
+            f"{a}/{a + b}v{c}/{c + d}" for a, b, c, d in strata
+        )
+        out.append(
+            {
+                "label": "H3 backfire (STRATIFIED)",
+                "left": "unilateral (ct+v)",
+                "left_k": lu,
+                "left_n": nu,
+                "right": "bilateral (ct+v)",
+                "right_k": lb,
+                "right_n": nb,
+                "p": stratified_exact(strata),
+                "detail": detail,
+            }
+        )
 
     for arm in ("verifiable", "cheap_talk"):
         add(
@@ -268,11 +394,23 @@ def contrasts(rows: List[dict]) -> List[dict]:
         and not (r["arm"] == "verifiable" and r["laterality"] == "bilateral_blind")
     ]
     add(
-        "uptake",
+        "uptake (vs all asks)",
         "verifiable:blind",
         blind_v,
         "all other asks",
         others,
+        "cp_accepted_bilateral_rules",
+    )
+    # The claim the write-up actually makes is about WITHHOLDING the
+    # no-retaliation disclosure. The pooled comparator above varies arm framing
+    # and disclosure together, so it does not isolate that; this one does —
+    # same arm, same ask, disclosure the only difference.
+    add(
+        "uptake (disclosure only)",
+        "verifiable:blind",
+        blind_v,
+        "verifiable:bilateral",
+        _cell_rows(rows, "verifiable", "bilateral"),
         "cp_accepted_bilateral_rules",
     )
     return out
@@ -391,11 +529,19 @@ def format_experiment_table(summary: dict) -> str:
         "-" * 94,
     ]
     if summary.get("contrasts"):
-        lines.append("contrasts (two-sided Fisher exact; the claim each one adjudicates)")
+        lines.append(
+            "contrasts (two-sided exact; Fisher unless marked STRATIFIED, which is the"
+            " design-matched combined test)"
+        )
         for c in summary["contrasts"]:
+            # Widths sized for the longest real labels ("verifiable:uni scaffolded",
+            # "uptake (disclosure only)") so the block can be pasted verbatim
+            # without hand-editing — the earlier hand-trimmed copy in the write-up
+            # was a reproducibility gap, not a formatting nicety.
             lines.append(
-                f"  {c['label']:26} {c['left']:>22} {c['left_k']:>3}/{c['left_n']:<3} vs "
-                f"{c['right']:<22} {c['right_k']:>3}/{c['right_n']:<3}  p={c['p']:.2e}"
+                f"  {c['label']:28} {c['left']:>26} {c['left_k']:>3}/{c['left_n']:<3} vs "
+                f"{c['right']:<24} {c['right_k']:>3}/{c['right_n']:<4} p={c['p']:.2e}"
+                + (f"  [{c['detail']}]" if c.get("detail") else "")
             )
         lines.append("-" * 94)
     return "\n".join(lines)

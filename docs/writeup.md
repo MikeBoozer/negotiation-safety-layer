@@ -5,7 +5,7 @@
 *Epistemic status: empirical, and narrower than it looks. First implementation (to my
 knowledge) of Sauerberg & Oesterheld's AAAI'26 ex-post-verifiable-commitment theory in LLM
 bargaining agents. Two results I'd defend: the headline deterrence gradient (Fisher exact
-p=8.3e-03 on the decisive step) and the uptake flip (0/100 vs 39/40, p=6e-13). Three things
+p=8.3e-03 on the decisive step) and the uptake flip (39/40 signed vs 0/100, p < 10⁻¹⁰). Three things
 I would not: the mechanism split behind the bilateral backfire is **unresolved in both arms**
 (p=0.089 verifiable, p=0.17 cheap-talk), the H2 enforcement-vs-prompting contrast is **null**
 (p=0.49, one event), and **every episode in this experiment runs the same single scenario
@@ -23,7 +23,13 @@ trail is committed to the repo (`review-findings.md`) — including one finding 
 how this post states its H3 result. A later pre-publication methods audit added the Fisher
 exact contrasts, and retracted three claims an earlier draft had overstated: H2 is null, the
 bilateral-blind mechanism is unresolved, and the single-scenario design (§4) had not been
-disclosed. No recorded number changed; the wording around them did.*
+disclosed. A further code review then caught a real defect in the contrast code itself: an
+absolute tie tolerance in the Fisher implementation corrupted p-values far below it, so the
+uptake contrast was published as 5.95e-13 when the correct value is 5.71e-34 — an error that
+made the result look weaker than it is. It is fixed, cross-checked against `scipy`, and
+regression-tested, and the same review prompted replacing the pooled H3 test with the
+design-matched stratified one. **No number derived from the recorded episodes changed; two
+derived statistics did, both in the direction of a stronger result.***
 
 ## TL;DR
 
@@ -45,13 +51,16 @@ disclosed. No recorded number changed; the wording around them did.*
   The counterparty declined the mutual no-threat handshake in **60/60** episodes. Merely
   being *asked* (plus reading our no-retaliation clause) also appears to have *raised* its
   threat rate vs the unilateral arms — though that backfire only clears α=0.05 when the two
-  measurable arms are pooled (7/40 → 18/40, p=0.015); neither arm reaches it alone (p=0.056
-  cheap-talk, p=0.106 verifiable). The theoretically weaker unilateral commitment delivered
+  measurable arms are combined (7/40 → 18/40, stratified exact p=0.006); neither arm reaches it
+  alone (p=0.056 cheap-talk, p=0.106 verifiable). The theoretically weaker unilateral commitment delivered
   the larger realized Pareto improvement.
 - **A follow-up arm (N=40) shows the uptake bottleneck was largely self-inflicted.** Keeping
   the verifiable ask but *withholding* our no-retaliation disclosure flipped acceptance of
-  the mutual no-threat pact from 0/100 to **39/40** (p=6e-13) — the one result here I'd call
-  settled. It *also* returned the threat rate to near-unilateral levels (0.05 vs 0.00), which
+  the mutual no-threat pact from 0/100 to **39/40** (p < 10⁻¹⁰) — the one result here I'd call
+  settled. Restricting the comparison to the arm that isolates the disclosure (verifiable
+  bilateral, 0/20 — a comparison I added after the fact, like the stratified test) rather than
+  pooling every ask is equally decisive. The counts carry this
+  result; the p-values only confirm that 39/40-vs-0/100 is not a sampling accident. It *also* returned the threat rate to near-unilateral levels (0.05 vs 0.00), which
   is suggestive of a disclosure-driven backfire but does **not** reach significance against
   the disclosed arm (0.05 vs 0.20, p=0.089); I report the direction and leave the mechanism
   open. The ex post checker caught two non-scripted violations among the signers.
@@ -205,25 +214,40 @@ verifiable:bilateral        20       0.200     [0.08,0.42]    0.20       3.2    
 (validity) cheater detection    : 1.000   (n=5)
 (validity) checker re-check     : 0 mismatches (stored verdict == checker(stored facts))
 
-contrasts (two-sided Fisher exact; the claim each one adjudicates)
-  H1 gradient                        none:uni  20/20  vs cheap_talk:uni       7/20   p=1.29e-05
-  H1 gradient (decisive)       cheap_talk:uni   7/20  vs verifiable:uni       0/20   p=8.32e-03
-  H1 gradient                        none:uni  20/20  vs verifiable:uni       0/20   p=1.45e-11
-  H2 enforcement vs prompting     scaffolded  20/20  vs raw                 18/19   p=4.87e-01
-  H3 backfire (cheap_talk)     cheap_talk:uni   7/20  vs cheap_talk:bilat   14/20   p=5.62e-02
-  H3 backfire (verifiable)     verifiable:uni   0/20  vs verifiable:bilat    4/20   p=1.06e-01
-  H3 backfire (pooled)             uni (ct+v)   7/40  vs bilateral (ct+v)   18/40   p=1.50e-02
-  blind mechanism (verifiable)  verifiable:blind   2/40  vs verifiable:bilat  4/20   p=8.86e-02
-  blind mechanism (cheap_talk)  cheap_talk:blind  20/40  vs cheap_talk:bilat 14/20   p=1.74e-01
-  uptake                        verifiable:blind  39/40  vs all other asks    0/100  p=5.95e-13
+contrasts (two-sided exact; Fisher unless marked STRATIFIED, which is the design-matched combined test)
+  H1 gradient                                    none:uni  20/20  vs cheap_talk:uni             7/20   p=1.29e-05
+  H1 gradient (decisive)                   cheap_talk:uni   7/20  vs verifiable:uni             0/20   p=8.32e-03
+  H1 gradient                                    none:uni  20/20  vs verifiable:uni             0/20   p=1.45e-11
+  H2 enforcement vs prompting   verifiable:uni scaffolded  20/20  vs verifiable:uni raw        18/19   p=4.87e-01
+  H3 backfire (cheap_talk)                 cheap_talk:uni   7/20  vs cheap_talk:bilateral      14/20   p=5.62e-02
+  H3 backfire (verifiable)                 verifiable:uni   0/20  vs verifiable:bilateral       4/20   p=1.06e-01
+  H3 backfire (pooled)                         uni (ct+v)   7/40  vs bilateral (ct+v)          18/40   p=1.50e-02
+  H3 backfire (STRATIFIED)              unilateral (ct+v)   7/40  vs bilateral (ct+v)          18/40   p=6.08e-03  [strata 7/20v14/20 0/20v4/20]
+  blind mechanism (verifiable)           verifiable:blind   2/40  vs verifiable:bilateral       4/20   p=8.86e-02
+  blind mechanism (cheap_talk)           cheap_talk:blind  20/40  vs cheap_talk:bilateral      14/20   p=1.74e-01
+  uptake (vs all asks)                   verifiable:blind  39/40  vs all other asks             0/100  p=5.71e-34
+  uptake (disclosure only)               verifiable:blind  39/40  vs verifiable:bilateral       0/20   p=5.01e-15
 ```
 
-A note on how to read those: **Wilson-interval disjointness is a conservative eyeball test,
-not a hypothesis test.** Where the two disagree — as they do for the blind-arm mechanism — the
-p-value is what the claim has to answer to, and I've moved the prose accordingly. The decisive
-H1 contrast (p=8.3e-03) clears α=0.01 but would *not* survive a Bonferroni correction across
-all ~15 available cell contrasts; it is reported as primary because H1 is the hypothesis the
-arms were built to test, which is a design commitment you should weigh against the
+*(That block is the verbatim tail of the two-file command above — the cells table is from the
+main-grid file alone, so running the one-file command shows the table without the blind rows or
+the blind contrasts.)*
+
+Two notes on how to read it. First, **Wilson-interval disjointness is a conservative eyeball
+test, not a hypothesis test** — on this data the two never actually conflict, but where they
+would, the p-value is what the claim answers to. Second, **combining the two measurable arms for
+H3 is done by a stratified exact test, not by pooling.** This is the exact conditional analogue
+of the **Cochran–Mantel–Haenszel** test, which is the name most readers will know it by; the
+exact version is used because `verifiable:unilateral` is 0/20 and a zero cell makes CMH's
+chi-square approximation unreliable at these sizes. Pooling collapses a design that was
+stratified by construction and is *conservative* here (p=0.015 vs 0.0061); the stratified test is
+the analysis the design calls for. It is reported alongside the pooled number because an earlier
+draft quoted the pooled one. Balanced 20/20 allocation means pooling could not have *reversed*
+the direction — the usual Simpson worry doesn't apply — but it did understate the effect.
+
+The decisive H1 contrast (p=8.3e-03) clears α=0.01 but would *not* survive a Bonferroni
+correction across the 12 contrasts the script emits (α=0.05/12 = 0.0042); it is reported as
+primary because H1 is the hypothesis the arms were built to test, which is a design commitment you should weigh against the
 pre-registration caveat below.
 
 Surplus is reported both ways deliberately: **E[ours$]** is expected surplus per episode
@@ -257,9 +281,10 @@ The counterparty declined the mutual no-threat handshake in **60/60 bilateral ep
 across all arms — that part is unambiguous. Worse, the bilateral arms saw *more* coercion than
 their unilateral twins (0.70 vs 0.35 cheap-talk; 0.20 vs 0.00 verifiable). Be careful with
 that second claim: each arm on its own is short of significance (p=0.056 and p=0.106), and it
-is only the pooled contrast — 7/40 unilateral vs 18/40 bilateral, p=0.015 — that clears α=0.05.
-Pooling was a post-hoc choice on my part, so read the backfire as "supported, on a test I
-picked after seeing the split," not as two independent replications. Two candidate mechanisms, both visible in
+is only the two arms combined — 7/40 unilateral vs 18/40 bilateral — that clears α=0.05, at
+stratified exact p=0.006 (the pooled 2x2 gives a more conservative 0.015). Combining was a
+post-hoc choice on my part, and stratifying does not cure that: read the backfire as "supported,
+on a test I chose after seeing the split," not as two independent replications. Two candidate mechanisms, both visible in
 transcripts: (a) our bilateral statement discloses a **no-retaliation** clause — in the
 theory matrix removing our retaliation makes threats *dominated*, but a psychological agent
 reads "the seller won't retaliate" as "threats are cheap"; (b) having just *refused* the
@@ -306,8 +331,9 @@ interesting datum in the cell.** The prompt-only (raw) negotiator complied in 18
 episodes vs 20/20 scaffolded. That is a **one-episode** difference, and Fisher exact puts it
 at p=0.49: this cell does not distinguish enforcement from prompting, and I'm no longer
 claiming it does. Detecting a gap this small (1.00 vs 0.947) at 80% power needs **~150
-episodes per arm** — simulated against this cell's rates, 4000 draws — so N=20 was never
-going to resolve it. That is a design note for anyone extending this.
+episodes per arm** — `analyze_experiment.py::min_n_for_power`, a seeded 4000-draw simulation
+against this cell's rates, so the figure regenerates like every other number here. N=20 was
+never going to resolve it (power < 0.20). That is a design note for anyone extending this.
 
 The single violation is worth reading anyway, as a *hypothesis* about where prompting fails:
 the buyer offered **121 — above baseline — with an ultimatum attached** ("Take it or we
@@ -367,7 +393,7 @@ and the primary instrument is held fixed across arms.
   none arm) — the secondary measures and quoted transcripts let readers judge.
 - The theory anchor is a deliberately small matrix; the mapping from open-ended bargaining to
   its action skeleton is an abstraction we document, not derive.
-- **Sample sizes**: the headline gradient and the uptake flip (0/100 → 39/40, p=6e-13) are
+- **Sample sizes**: the headline gradient and the uptake flip (39/40 vs 0/100, p < 10⁻¹⁰) are
   the two findings adequately powered here. The bilateral-blind follow-up (N=40) did **not**
   resolve the mechanism in either arm (p=0.089 verifiable, p=0.17 cheap-talk), H2 is null at
   p=0.49, and the unilateral/disclosed comparator cells are still N=20. Rates in the messy

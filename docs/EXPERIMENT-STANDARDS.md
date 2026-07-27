@@ -58,8 +58,8 @@ as *per scenario × model cell*, with Rule 0 already satisfied:
 
 Do an **actual power calculation** once you fix the *minimum interesting effect size* — don't reuse a
 prior N because it worked for a different (larger) effect. A simulation is fine and takes minutes:
-draw from the observed rates, run the test, count rejections. (This project's H2 contrast needed
-~150/arm for 80% power — which is how we know N=20 was never going to resolve it.)
+draw from the observed rates, run the test, count rejections. (This project's H2 contrast needed ~150/arm for 80%
+power — computed by `analyze_experiment.py::min_n_for_power`, not by hand, which is the point of 3b.)
 
 ## Calibrate against the comparison class before fixing the design
 
@@ -77,7 +77,7 @@ Note what these papers **do not** do: none reports significance tests, and none 
 Limitations section. Statistical care is *above* field norm here and cheap to keep — breadth is where
 the field spends, and where a narrow result gets challenged.
 
-## The seven standards
+## The standards
 
 1. **Multiple model families, always.** A single-family result (this project's own top limitation) is
    not credible for any claim meant to generalize. Budget for ≥4–6 across vendors, including open
