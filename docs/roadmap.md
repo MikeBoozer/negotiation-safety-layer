@@ -17,9 +17,18 @@ whichever comes first. Treat this as a living document, not a commitment.
 Re-ranked against fresh findings. **The R1–R9 content still holds — none is invalidated — but the
 sequencing changed:**
 
+- **Superseded 2026-07-27 — read this before acting on the bullet below.** A pre-publication methods
+  audit changed what "hardening" should mean. Extending the N=20 comparator cells is **no longer the
+  recommended spend**: every episode so far runs a *single* scenario instance, so more repetitions of
+  the same prompt buy almost nothing (see **Rule 0** in
+  [`EXPERIMENT-STANDARDS.md`](EXPERIMENT-STANDARDS.md) — doubling *items* is the largest available
+  variance reduction, and repetitions are not items). The revised first move is **breadth**: the three
+  unilateral cells re-run across ~5 scenario instances × 2–3 model families, at roughly the same cost.
+  The audit also found the write-up's H2 contrast is null (p=0.49) and the bilateral mechanism split
+  unresolved (p=0.089) — so "resolve the cheap-talk arm" is no longer the goal that justifies a run.
 - **Do first (new, cheap, unblocks everything).** The two parked hardening extensions from
-  [`writeup.md`](writeup.md) §7 — extend the N=20 comparator cells (to resolve the still-open
-  cheap-talk arm) and add a **second model family** (Standard #1 in
+  [`writeup.md`](writeup.md) §7 — ~~extend the N=20 comparator cells (to resolve the still-open
+  cheap-talk arm)~~ *(superseded — see above)* and add a **second model family** (Standard #1 in
   [`EXPERIMENT-STANDARDS.md`](EXPERIMENT-STANDARDS.md)) — then **post the write-up publicly**
   (arXiv / Alignment Forum), positioned against *Cheap Talk, Empty Promise* (nine frontier LLMs break
   public promises 56.6% of the time, mostly without awareness, and name verifiability/enforcement

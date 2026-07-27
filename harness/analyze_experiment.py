@@ -2,6 +2,10 @@
 numbers can be regenerated from the recorded data forever.
 
   python harness/analyze_experiment.py --in results/experiment.jsonl
+  python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl
+
+--in accepts several files so cross-run contrasts (the bilateral-blind arm
+lives in its own file) regenerate from one command like everything else.
 
 Reports, per (arm x laterality) LLM cell: the H1 threat rates (detector label
 is the primary, arm-invariant instrument; self-report and regex as secondary),
@@ -12,6 +16,13 @@ an earlier draft. H2 contrasts scaffolded vs raw compliance in the verifiable
 unilateral cells, reporting its exclusions explicitly. Validity: the cheater
 cell's detection rate (want 1.000) and a re-check of every row's compliance
 verdict via nsl.disarmament.check_ex_post (want 0 mismatches).
+
+CONTRASTS: every comparison the write-up asserts gets a two-sided Fisher exact
+p-value, computed here rather than typed into the prose, so a reader can check
+the inference and not just the rates. Wilson-interval disjointness is a
+conservative eyeball test, not a hypothesis test; where the two disagree the
+p-value is what the claim must answer to. Contrasts are emitted only when both
+their cells are present in the loaded rows.
 
 What the re-check certifies: for rows that store the checker's input facts
 (their_threat / our_message_threat — written by the runner since the pass-1
@@ -44,9 +55,14 @@ from nsl.disarmament import TranscriptFacts, build_our_commitment, check_ex_post
 from nsl.scenarios.otc_rfq import OTCScenario  # noqa: E402
 
 
-def load_rows(path: str) -> List[dict]:
-    with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+def load_rows(*paths: str) -> List[dict]:
+    """Rows from one or more JSONL files, concatenated. Multiple files let a
+    single command span the main grid and the separate blind-arm run."""
+    rows: List[dict] = []
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
+            rows += [json.loads(line) for line in f if line.strip()]
+    return rows
 
 
 def wilson(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
@@ -58,6 +74,38 @@ def wilson(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
     center = (p + z * z / (2 * n)) / denom
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
     return (max(0.0, center - half), min(1.0, center + half))
+
+
+def fisher_exact(a: int, b: int, c: int, d: int) -> float:
+    """Two-sided Fisher exact p for the 2x2 table [[a,b],[c,d]].
+
+    Sums the hypergeometric probability of every table with the same margins
+    that is no more likely than the observed one. Exact (no normal
+    approximation), which is what these cell sizes and near-0/near-1 rates
+    need — a chi-square here would be untrustworthy exactly where the headline
+    effects live.
+    """
+    n, r1, c1 = a + b + c + d, a + b, a + c
+    if n == 0 or r1 in (0, n) or c1 in (0, n):
+        return 1.0
+
+    def prob(x: int) -> float:
+        return (
+            math.comb(r1, x) * math.comb(n - r1, c1 - x) / math.comb(n, c1)
+        )
+
+    observed = prob(a)
+    lo, hi = max(0, c1 - (n - r1)), min(r1, c1)
+    # 1e-12 slack: ties must count, and equal-probability tables can differ in
+    # the last bits after the binomial division.
+    return min(1.0, sum(p for x in range(lo, hi + 1) if (p := prob(x)) <= observed + 1e-12))
+
+
+def _counts(rows: List[dict], key: str, value=True) -> Tuple[int, int]:
+    """(successes, applicable n) for a field, skipping not-applicable Nones —
+    same denominator rule as _rate, so contrasts and rates never disagree."""
+    scored = [r for r in rows if r.get(key) is not None]
+    return sum(1 for r in scored if r[key] == value), len(scored)
 
 
 def _rate(rows: List[dict], key: str, value=True) -> Optional[float]:
@@ -115,6 +163,119 @@ def rederive_compliance_mismatches(rows: List[dict]) -> int:
         if report.compliant != r["compliance_ours"]:
             mismatches += 1
     return mismatches
+
+
+def _cell_rows(rows: List[dict], arm: str, lat: str, scaffold: str = "full") -> List[dict]:
+    return [
+        r
+        for r in rows
+        if r["arm"] == arm
+        and r["laterality"] == lat
+        and r["counterparty"] == "llm"
+        and r["scaffold"] == scaffold
+    ]
+
+
+def contrasts(rows: List[dict]) -> List[dict]:
+    """Two-sided Fisher exact p for every comparison the write-up asserts.
+
+    Each entry names the claim it adjudicates, so a claim that loses its
+    p-value cannot quietly stay in the prose. Emitted only when both cells are
+    present (the bilateral-blind cells live in a separate results file)."""
+    out: List[dict] = []
+
+    def add(label: str, left: str, lrows: List[dict], right: str, rrows: List[dict], key: str) -> None:
+        if not lrows or not rrows:
+            return
+        a, na = _counts(lrows, key)
+        c, nc = _counts(rrows, key)
+        if na == 0 or nc == 0:
+            return
+        out.append(
+            {
+                "label": label,
+                "left": left,
+                "left_k": a,
+                "left_n": na,
+                "right": right,
+                "right_k": c,
+                "right_n": nc,
+                "p": fisher_exact(a, na - a, c, nc - c),
+            }
+        )
+
+    uni = {arm: _cell_rows(rows, arm, "unilateral") for arm in ARMS}
+    key = "cp_threat_detector"
+    add("H1 gradient", "none:uni", uni["none"], "cheap_talk:uni", uni["cheap_talk"], key)
+    add("H1 gradient (decisive)", "cheap_talk:uni", uni["cheap_talk"], "verifiable:uni", uni["verifiable"], key)
+    add("H1 gradient", "none:uni", uni["none"], "verifiable:uni", uni["verifiable"], key)
+
+    # H2 is a compliance contrast across scaffolds, not across arms.
+    add(
+        "H2 enforcement vs prompting",
+        "verifiable:uni scaffolded",
+        _cell_rows(rows, "verifiable", "unilateral", "full"),
+        "verifiable:uni raw",
+        _cell_rows(rows, "verifiable", "unilateral", "raw"),
+        "compliance_ours",
+    )
+
+    # H3's backfire: does asking for reciprocity RAISE the threat rate? Reported
+    # per-arm and pooled, because the pooled test is the only one that clears
+    # alpha and a reader is entitled to see that it needed pooling to do so.
+    # 'none' is excluded from the pool: it is at 1.00 in both lateralities, so
+    # it can only dilute an effect it has no headroom to show.
+    for arm in ("cheap_talk", "verifiable"):
+        add(
+            f"H3 backfire ({arm})",
+            f"{arm}:uni",
+            _cell_rows(rows, arm, "unilateral"),
+            f"{arm}:bilateral",
+            _cell_rows(rows, arm, "bilateral"),
+            key,
+        )
+    add(
+        "H3 backfire (pooled)",
+        "uni (ct+v)",
+        _cell_rows(rows, "cheap_talk", "unilateral") + _cell_rows(rows, "verifiable", "unilateral"),
+        "bilateral (ct+v)",
+        _cell_rows(rows, "cheap_talk", "bilateral") + _cell_rows(rows, "verifiable", "bilateral"),
+        key,
+    )
+
+    for arm in ("verifiable", "cheap_talk"):
+        add(
+            f"blind mechanism ({arm})",
+            f"{arm}:blind",
+            _cell_rows(rows, arm, "bilateral_blind"),
+            f"{arm}:bilateral",
+            _cell_rows(rows, arm, "bilateral"),
+            key,
+        )
+
+    # Uptake: the blind verifiable ask vs every other LLM cell where the
+    # handshake ran. Scripted counterparties are excluded — the cheater ACCEPTS
+    # by construction (that is the point of the validity probe), so pooling it
+    # would credit the scripted cell's 5 scripted acceptances to the uptake
+    # claim, which is about what a free-choosing LLM counterparty signs.
+    blind_v = _cell_rows(rows, "verifiable", "bilateral_blind")
+    others = [
+        r
+        for r in rows
+        if r.get("cp_accepted_bilateral_rules") is not None
+        and r["counterparty"] == "llm"
+        and r["scaffold"] == "full"
+        and not (r["arm"] == "verifiable" and r["laterality"] == "bilateral_blind")
+    ]
+    add(
+        "uptake",
+        "verifiable:blind",
+        blind_v,
+        "all other asks",
+        others,
+        "cp_accepted_bilateral_rules",
+    )
+    return out
 
 
 def summarize_experiment(rows: List[dict]) -> dict:
@@ -182,6 +343,7 @@ def summarize_experiment(rows: List[dict]) -> dict:
 
     return {
         "cells": cells,
+        "contrasts": contrasts(rows),
         "h2": {"full": h2_cell("full"), "raw": h2_cell("raw")},
         "validity": {
             "cheater_n": len(cheater),
@@ -228,14 +390,28 @@ def format_experiment_table(summary: dict) -> str:
         f"totals: {t['episodes']} episodes, est. cost ${t['cost_usd_est']:.2f}, modes={t['modes']}",
         "-" * 94,
     ]
+    if summary.get("contrasts"):
+        lines.append("contrasts (two-sided Fisher exact; the claim each one adjudicates)")
+        for c in summary["contrasts"]:
+            lines.append(
+                f"  {c['label']:26} {c['left']:>22} {c['left_k']:>3}/{c['left_n']:<3} vs "
+                f"{c['right']:<22} {c['right_k']:>3}/{c['right_n']:<3}  p={c['p']:.2e}"
+            )
+        lines.append("-" * 94)
     return "\n".join(lines)
 
 
 def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--in", dest="path", default=os.path.join("results", "experiment.jsonl"))
+    ap.add_argument(
+        "--in",
+        dest="paths",
+        nargs="+",
+        default=[os.path.join("results", "experiment.jsonl")],
+        help="one or more results JSONL files (pooled before analysis)",
+    )
     args = ap.parse_args(argv)
-    print(format_experiment_table(summarize_experiment(load_rows(args.path))))
+    print(format_experiment_table(summarize_experiment(load_rows(*args.paths))))
 
 
 if __name__ == "__main__":

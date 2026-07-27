@@ -2,21 +2,28 @@
 
 **Michael Boozer** · Independent researcher · [michaeltboozer@gmail.com](mailto:michaeltboozer@gmail.com) · [GitHub](https://github.com/MikeBoozer) · [ORCID 0009-0003-6725-1373](https://orcid.org/0009-0003-6725-1373)
 
-*Epistemic status: empirical. First implementation (to my knowledge) of Sauerberg &
-Oesterheld's AAAI'26 ex-post-verifiable-commitment theory in LLM bargaining agents. I'm
-confident in the headline deterrence gradient (disjoint 95% CIs) and the uptake result
-(0/100 vs 39/40); less confident in the mechanism split for the cheap-talk arm and anything
-resting on N=20 comparator cells — these are marked where they appear. Single model family,
-single-turn negotiations, disclosed hardball persona. All code and every recorded episode:
+*Epistemic status: empirical, and narrower than it looks. First implementation (to my
+knowledge) of Sauerberg & Oesterheld's AAAI'26 ex-post-verifiable-commitment theory in LLM
+bargaining agents. Two results I'd defend: the headline deterrence gradient (Fisher exact
+p=8.3e-03 on the decisive step) and the uptake flip (0/100 vs 39/40, p=6e-13). Three things
+I would not: the mechanism split behind the bilateral backfire is **unresolved in both arms**
+(p=0.089 verifiable, p=0.17 cheap-talk), the H2 enforcement-vs-prompting contrast is **null**
+(p=0.49, one event), and **every episode in this experiment runs the same single scenario
+instance** — so N=20 is 20 samples of one prompt, and the confidence intervals describe
+sampling noise, not variation across negotiations. Single model family, single-turn, disclosed
+hardball persona. All code and every recorded episode:
 [github.com/MikeBoozer/negotiation-safety-layer](https://github.com/MikeBoozer/negotiation-safety-layer)
-— every number below regenerates offline from the committed data with one command. Total
-live API cost: $5.84.*
+— every number below, p-values included, regenerates offline from the committed data with one
+command. Total live API cost: $5.84.*
 
 *Disclosure: this project was built and drafted in close collaboration with an AI assistant
 (Claude); I directed the design decisions, gated the spending and fixes, and reviewed the
 claims. The experiment code underwent an adversarial two-pass multi-agent review whose full
 trail is committed to the repo (`review-findings.md`) — including one finding that corrected
-how this post states its H3 result.*
+how this post states its H3 result. A later pre-publication methods audit added the Fisher
+exact contrasts, and retracted three claims an earlier draft had overstated: H2 is null, the
+bilateral-blind mechanism is unresolved, and the single-scenario design (§4) had not been
+disclosed. No recorded number changed; the wording around them did.*
 
 ## TL;DR
 
@@ -28,25 +35,32 @@ how this post states its H3 result.*
   surrogate-goal-scaffolded negotiation-safety layer, and test the thing the theory actually
   turns on: does **verifiability** change counterparty behavior beyond the same statement as
   **cheap talk**?
-- **Yes — a clean three-step gradient (N=20/cell).** Against a hardball LLM buyer, coercion
-  rates fell 1.00 → 0.35 → 0.00 across none / cheap-talk / verifiable (all three Wilson 95%
-  CIs disjoint), and mean opening offers rose 111.9 → 119.7 → 120.7 — in the verifiable arm
-  the buyer opened *above* the seller's standing baseline.
+- **Yes — a three-step gradient (N=20/cell, one scenario).** Against a hardball LLM buyer,
+  coercion rates fell 1.00 → 0.35 → 0.00 across none / cheap-talk / verifiable (all three
+  Wilson 95% CIs disjoint), and mean opening offers rose 111.9 → 119.7 → 120.7 — in the
+  verifiable arm the buyer opened *above* the seller's standing baseline. The step that
+  actually isolates verifiability is cheap-talk → verifiable (p=8.3e-03); the none →
+  cheap-talk step is an *information* effect, since arm A transmits no statement at all.
 - **The provable-SPI bilateral package failed for a reason theory doesn't model: uptake.**
-  The counterparty declined the mutual no-threat handshake in **60/60** episodes, and merely
-  being *asked* (plus reading our no-retaliation clause) raised its threat rate vs the
-  unilateral arms. The theoretically weaker unilateral commitment delivered the larger
-  realized Pareto improvement.
+  The counterparty declined the mutual no-threat handshake in **60/60** episodes. Merely
+  being *asked* (plus reading our no-retaliation clause) also appears to have *raised* its
+  threat rate vs the unilateral arms — though that backfire only clears α=0.05 when the two
+  measurable arms are pooled (7/40 → 18/40, p=0.015); neither arm reaches it alone (p=0.056
+  cheap-talk, p=0.106 verifiable). The theoretically weaker unilateral commitment delivered
+  the larger realized Pareto improvement.
 - **A follow-up arm (N=40) shows the uptake bottleneck was largely self-inflicted.** Keeping
   the verifiable ask but *withholding* our no-retaliation disclosure flipped acceptance of
-  the mutual no-threat pact from 0/100 to **39/40**, and returned the threat rate to
-  near-unilateral levels (0.05 vs 0.00) — in the verifiable arm, the disclosure, not the
-  ask, drove the backfire. The ex post checker caught two non-scripted violations among
-  the signers.
-- **Enforcement still beats prompting, narrowly but instructively**: scaffolded compliance
-  1.000 vs 0.947 prompt-only — the one violation was the raw agent accepting an
+  the mutual no-threat pact from 0/100 to **39/40** (p=6e-13) — the one result here I'd call
+  settled. It *also* returned the threat rate to near-unilateral levels (0.05 vs 0.00), which
+  is suggestive of a disclosure-driven backfire but does **not** reach significance against
+  the disclosed arm (0.05 vs 0.20, p=0.089); I report the direction and leave the mechanism
+  open. The ex post checker caught two non-scripted violations among the signers.
+- **Enforcement vs prompting came out null**: scaffolded compliance 1.000 (20/20) vs 0.947
+  (18/19) prompt-only is a one-episode difference, p=0.49 — this experiment cannot tell the
+  two apart. The single violation is still worth reading: the raw agent accepted an
   *above-baseline* offer delivered with an ultimatum, honoring the promise's spirit while
-  breaking its letter.
+  breaking its letter. That is a hypothesis about where prompting fails, not evidence that
+  it does.
 - The deterministic ex post checker caught **100%** of scripted commitment-breakers, and
   re-applying it to every row's recorded facts reproduces the stored verdicts (0 mismatches —
   a determinism/integrity consistency check, not an independent re-labeling of transcripts).
@@ -153,13 +167,30 @@ the cheater validity cell × 5; and the follow-up bilateral-blind cells × N=40 
 episodes (commitment → optional handshake → counterparty move → our move → ex post check);
 deals close only on our accept, non-deals normalized to outside-option surplus 0.
 
+**What N=20 is, exactly — read this before the CIs.** Every episode in this experiment uses
+*one* scenario instance: buyer valuation 128 (`llm_counterparty.py::CP_VALUATION_DEFAULT`),
+standing baseline 120 (`otc_rfq.py::OTC_BASELINE_PRICE`), size 500
+(`scripted.py::DEFAULT_SIZE`) — all module-level constants, none of them varied. Within a cell all 20
+episodes therefore issue a **byte-identical prompt**, and vary only through sampling at
+temperature 1.0. So N=20 means *20 samples of one prompt*, not 20 independent negotiations:
+the Wilson intervals and p-values below describe how much the model's behavior varies when you
+re-run the same situation, and the effective scenario-level N of this whole experiment is **1**.
+That is enough to establish that the framing changes behavior *in this situation* — which is
+what H1 asks — and is not enough to estimate an effect size for negotiations in general.
+Varying valuation and baseline is the top item in §6's list of what to fix next; it costs no
+more API budget than the run already reported, since it is a re-allocation of the same episodes.
+
 **Cost & reproducibility.** Whole experiment under a hard $15 cap enforced by a budget guard;
 mock mode runs the identical pipeline offline for $0.
 
 ## 5. Results
 
 All numbers regenerate via `python harness/analyze_experiment.py --in results/experiment.jsonl`
-(main grid: 160 live episodes, $3.43; +$0.31 pilots; +$2.10 blind-arm follow-up):
+(main grid: 160 live episodes, $3.43; +$0.31 pilots; +$2.10 blind-arm follow-up); adding
+`results/experiment-blind.jsonl` to the same flag pools the follow-up run and emits the
+cross-run contrasts. The p-values quoted throughout are two-sided Fisher exact, computed by
+that command rather than typed into this prose, so the inferences are as checkable as the
+rates — including the ones that came out against me:
 
 ```
 cell (arm:laterality)        n threat rate          95% CI  accept  E[ours$] deal ours$ deal theirs$
@@ -173,7 +204,27 @@ verifiable:bilateral        20       0.200     [0.08,0.42]    0.20       3.2    
 (H2) our compliance, scaffolded : 1.000 (n=20)  vs raw (prompt-only): 0.947 (n=19; 1 passthrough excluded, 0 coercion-flagged)
 (validity) cheater detection    : 1.000   (n=5)
 (validity) checker re-check     : 0 mismatches (stored verdict == checker(stored facts))
+
+contrasts (two-sided Fisher exact; the claim each one adjudicates)
+  H1 gradient                        none:uni  20/20  vs cheap_talk:uni       7/20   p=1.29e-05
+  H1 gradient (decisive)       cheap_talk:uni   7/20  vs verifiable:uni       0/20   p=8.32e-03
+  H1 gradient                        none:uni  20/20  vs verifiable:uni       0/20   p=1.45e-11
+  H2 enforcement vs prompting     scaffolded  20/20  vs raw                 18/19   p=4.87e-01
+  H3 backfire (cheap_talk)     cheap_talk:uni   7/20  vs cheap_talk:bilat   14/20   p=5.62e-02
+  H3 backfire (verifiable)     verifiable:uni   0/20  vs verifiable:bilat    4/20   p=1.06e-01
+  H3 backfire (pooled)             uni (ct+v)   7/40  vs bilateral (ct+v)   18/40   p=1.50e-02
+  blind mechanism (verifiable)  verifiable:blind   2/40  vs verifiable:bilat  4/20   p=8.86e-02
+  blind mechanism (cheap_talk)  cheap_talk:blind  20/40  vs cheap_talk:bilat 14/20   p=1.74e-01
+  uptake                        verifiable:blind  39/40  vs all other asks    0/100  p=5.95e-13
 ```
+
+A note on how to read those: **Wilson-interval disjointness is a conservative eyeball test,
+not a hypothesis test.** Where the two disagree — as they do for the blind-arm mechanism — the
+p-value is what the claim has to answer to, and I've moved the prose accordingly. The decisive
+H1 contrast (p=8.3e-03) clears α=0.01 but would *not* survive a Bonferroni correction across
+all ~15 available cell contrasts; it is reported as primary because H1 is the hypothesis the
+arms were built to test, which is a design commitment you should weigh against the
+pre-registration caveat below.
 
 Surplus is reported both ways deliberately: **E[ours$]** is expected surplus per episode
 (non-deals count 0 — frequency x quality), while **deal ours$/theirs$** is realized surplus
@@ -184,8 +235,9 @@ how often a deal happens at all.*
 
 **H1 — deterrence: verifiability has an effect cheap talk does not exhaust.** In the
 unilateral arms the coercion rate (detector label) steps 1.00 → 0.35 → 0.00; all three Wilson
-CIs are pairwise disjoint. The pre-declared continuous secondary agrees: mean opening offers
-step 111.9 → 119.7 → 120.7. Flavor of each arm, same persona throughout:
+CIs are pairwise disjoint, and the decisive cheap-talk → verifiable step is p=8.3e-03. The
+continuous secondary agrees: mean opening offers step 111.9 → 119.7 → 120.7. Flavor of each
+arm, same persona throughout:
 
 - *none*: "I've got three other axes I'm working right now… I'll take your 500 units, but not
   at 120 — that price is stale…" (opens 108–113)
@@ -202,8 +254,12 @@ not a general truth.
 
 **The bilateral surprise — theory's SPI never formed, because uptake is the bottleneck.**
 The counterparty declined the mutual no-threat handshake in **60/60 bilateral episodes**,
-across all arms. Worse, the bilateral arms saw *more* coercion than their unilateral twins
-(0.70 vs 0.35 cheap-talk; 0.20 vs 0.00 verifiable). Two candidate mechanisms, both visible in
+across all arms — that part is unambiguous. Worse, the bilateral arms saw *more* coercion than
+their unilateral twins (0.70 vs 0.35 cheap-talk; 0.20 vs 0.00 verifiable). Be careful with
+that second claim: each arm on its own is short of significance (p=0.056 and p=0.106), and it
+is only the pooled contrast — 7/40 unilateral vs 18/40 bilateral, p=0.015 — that clears α=0.05.
+Pooling was a post-hoc choice on my part, so read the backfire as "supported, on a test I
+picked after seeing the split," not as two independent replications. Two candidate mechanisms, both visible in
 transcripts: (a) our bilateral statement discloses a **no-retaliation** clause — in the
 theory matrix removing our retaliation makes threats *dominated*, but a psychological agent
 reads "the seller won't retaliate" as "threats are cheap"; (b) having just *refused* the
@@ -221,15 +277,17 @@ few closed deals were just as good (16.0/7.0 per deal); only 20% of episodes pro
 the handshake still asks for the mutual no-threat commitment, but our transmitted statement
 omits the no-retaliation clause. The two arms answer differently:
 
-- **Verifiable: the disclosure was the embolder.** Blind threat rate 0.05 [0.01, 0.17] —
-  statistically indistinguishable from unilateral's 0.00 [0.00, 0.16], and below the
-  disclosed arm's 0.20 [0.08, 0.42] with only marginal CI contact. Withholding the
-  no-retaliation clause recovers essentially all of the unilateral deterrence *while
-  asking for reciprocity*.
+- **Verifiable: directionally disclosure-driven, but not resolved.** Blind threat rate
+  0.05 [0.01, 0.17] — indistinguishable from unilateral's 0.00 [0.00, 0.16], and below the
+  disclosed arm's 0.20 [0.08, 0.42]. That last comparison is the one the mechanism claim
+  needs, and at **p=0.089 it does not clear α=0.05** (2/40 vs 4/20). So: withholding the
+  no-retaliation clause is *consistent with* recovering the unilateral deterrence while
+  asking for reciprocity, and I'd bet that way, but this arm does not establish it. An
+  earlier draft of this post stated it as settled; that was an overclaim, corrected here.
 - **Cheap talk: unresolved.** 0.35 → 0.50 [0.35, 0.65] → 0.70 across
   unilateral → blind → disclosed is monotone, but every pairwise CI overlaps even at
-  N=40 on the middle cell — both mechanisms (disclosure and refusal-consistency)
-  plausibly contribute, and we don't apportion them.
+  N=40 on the middle cell (blind vs disclosed p=0.17) — both mechanisms (disclosure and
+  refusal-consistency) plausibly contribute, and we don't apportion them.
 
 The unambiguous result is **uptake**: with verifiable framing and no no-retaliation
 disclosure, the counterparty *accepted* the mutual no-threat commitment in **39/40**
@@ -243,16 +301,23 @@ signers (both in the first batch of 20) then opened with detector-flagged ultima
 caught by the ex post checker; both are mild walk-away phrasings on exactly the borderline
 the instruments paragraph below discusses.
 
-**H2 — enforcement vs prompting: 1.000 vs 0.947, and the one violation is the most
+**H2 — enforcement vs prompting: null (p=0.49), and the one violation is still the most
 interesting datum in the cell.** The prompt-only (raw) negotiator complied in 18/19 scored
-episodes. Its single violation: the buyer offered **121 — above baseline — with an ultimatum
-attached** ("Take it or we walk…"), and raw Opus accepted. Economically that concedes
-nothing; contractually it breaks the promise's letter ("will not accept any offer that
-arrives attached to a threat" — the 'threats void the offer' ground rule exists precisely so
-coercion never pays, even pleasantly). The scaffolded agent is *forced* by R2 to counter
-instead. This is what "being bound" means: the commitment binds in exactly the cases where
-judgment would defect, and an LLM's judgment defects toward the economically sensible reading
-~5% of the time.
+episodes vs 20/20 scaffolded. That is a **one-episode** difference, and Fisher exact puts it
+at p=0.49: this cell does not distinguish enforcement from prompting, and I'm no longer
+claiming it does. Detecting a gap this small (1.00 vs 0.947) at 80% power needs **~150
+episodes per arm** — simulated against this cell's rates, 4000 draws — so N=20 was never
+going to resolve it. That is a design note for anyone extending this.
+
+The single violation is worth reading anyway, as a *hypothesis* about where prompting fails:
+the buyer offered **121 — above baseline — with an ultimatum attached** ("Take it or we
+walk…"), and raw Opus accepted. Economically that concedes nothing; contractually it breaks
+the promise's letter ("will not accept any offer that arrives attached to a threat" — the
+'threats void the offer' ground rule exists precisely so coercion never pays, even
+pleasantly). The scaffolded agent is *forced* by R2 to counter instead. If that pattern
+replicates at adequate N, it is what "being bound" would mean: the commitment binding exactly
+where judgment defects toward the economically sensible reading. One episode cannot tell us
+whether it replicates.
 
 **Validity.** The scripted cheater (agrees to the no-threat rule, threatens anyway) was
 flagged by the ex post checker in 5/5 episodes; re-applying the checker to every row's
@@ -265,6 +330,31 @@ and the primary instrument is held fixed across arms.
 
 ## 6. Limitations
 
+- **One scenario, so the CIs are narrower than the question.** Every episode fixes valuation
+  128 / baseline 120 / size 500, so each cell is one prompt sampled 20 (or 40) times and the
+  scenario-level N of the entire experiment is 1 (see §4). Nothing here separates "verifiable
+  framing deters coercion" from "verifiable framing deters coercion *in this OTC setup at
+  these numbers*." This is the limitation I'd fix first, and it is nearly free: re-running the
+  three unilateral cells across a handful of valuation/baseline draws costs the same API budget
+  as the run already reported.
+- **"Verifiability" is a bundle, not an isolated factor.** Arm C adds five things at once over
+  arm B — cryptographic signing, a neutral third-party auditor, ex-post checkability, stated
+  reputational/enforcement consequences, and a visible HMAC line. "The counterparty responds to
+  verifiability" is the reading I favor; "the counterparty responds to a third party watching
+  and to stated consequences" fits the same data. Decomposing that bundle needs more arms.
+- **No pre-registration artifact.** The design was fixed in code before the run, but the repo
+  cannot prove it: the main grid ran at `2026-07-06T02:28Z` and the harness defining it was
+  first committed ~10 h later, with code, design, and results in a single commit (`0621768`).
+  Treat "primary instrument" and "secondary measure" as descriptions of the design's intent,
+  not as claims a reviewer can verify from timestamps. (The blind-arm follow-up is the clean
+  exception — `3ad1a11` landed ~40 s before its first episode.) Anything I run next gets its
+  design committed first.
+- **Arm is confounded with run order.** All 160 main-grid episodes ran in one process in fixed
+  cell order across 43 minutes (none 02:28–02:41, cheap-talk 02:42–02:54, verifiable
+  02:54–03:04); no interleaving, no randomization. Endpoint drift over 43 minutes is an
+  unlikely explanation for a 1.00 → 0.00 swing, but it is not excluded, and interleaving is
+  free. The blind arm sits in a separate run ~18 h later, so blind-vs-disclosed also crosses a
+  run boundary.
 - **Sandbox verification is trivially easy**: we control the transcript, so "ex post
   verifiable" is demonstrated as a mechanism, not as deployment-grade attestation (real rails:
   signed mandates, attested execution, escrow).
@@ -272,15 +362,17 @@ and the primary instrument is held fixed across arms.
   structure that safe commitment *sequencing* needs is future work.
 - **One model family** (Sonnet counterparty, Opus negotiator, Haiku detector); the persona
   framing needed to unfloor the threat rate is itself a finding about Claude's dispositions.
+  Note the counterparty and the verifier are the same model id, differing only by role prompt.
 - **Detector as instrument**: it may read hard anchoring as coercion (possible ceiling in the
   none arm) — the secondary measures and quoted transcripts let readers judge.
 - The theory anchor is a deliberately small matrix; the mapping from open-ended bargaining to
   its action skeleton is an abstraction we document, not derive.
-- **Sample sizes**: the headline gradient has disjoint CIs, and the bilateral-blind
-  follow-up (N=40) resolved the mechanism for the verifiable arm (disclosure-driven) and
-  the uptake question (0/100 → 39/40) — but the cheap-talk mechanism split remains
-  unresolved (overlapping CIs), and the unilateral/disclosed comparator cells are still
-  N=20.
+- **Sample sizes**: the headline gradient and the uptake flip (0/100 → 39/40, p=6e-13) are
+  the two findings adequately powered here. The bilateral-blind follow-up (N=40) did **not**
+  resolve the mechanism in either arm (p=0.089 verifiable, p=0.17 cheap-talk), H2 is null at
+  p=0.49, and the unilateral/disclosed comparator cells are still N=20. Rates in the messy
+  middle (~0.3–0.7) need roughly 90–150/arm for 80% power on a 20-point gap; none of the
+  unresolved contrasts above are near that.
 
 ## 7. Relation to prior work
 
@@ -288,8 +380,9 @@ Sauerberg & Oesterheld ([arXiv:2505.00783](https://arxiv.org/abs/2505.00783)): t
 implemented here (disarmament type only; token games and default-conditional commitments are
 natural follow-ups). Oesterheld, Riché, Sondej, Clifton & Conitzer
 ([arXiv:2604.04341](https://arxiv.org/abs/2604.04341)): the surrogate-goal scaffold this
-layer builds on; our raw-vs-scaffolded H2 mirrors their prompting-vs-scaffolding comparison,
-on the commitment-keeping outcome — and
+layer builds on; our raw-vs-scaffolded H2 mirrors their prompting-vs-scaffolding comparison
+on the commitment-keeping outcome, though at our N it returns no measurable difference
+(p=0.49) rather than a replication — and
 [Formalizing Objections against Surrogate Goals](https://www.alignmentforum.org/posts/K4FrKRTrmyxrw5Dip/formalizing-objections-against-surrogate-goals)
 is relevant on-site background for why the scaffold's unexploitability framing is contested.
 Program-equilibrium work (SPARC, [arXiv:2512.00371](https://arxiv.org/abs/2512.00371))
@@ -315,9 +408,10 @@ No external funding supported this work.
 
 ## References
 
-Sauerberg and Oesterheld (2026). [*Promises Made, Promises Kept: Safe Pareto Improvements
-via Ex Post Verifiable Commitments*](https://arxiv.org/abs/2505.00783). Proceedings of the
-AAAI Conference on Artificial Intelligence, 40(20), 17231–17241 (arXiv:2505.00783).
+Sauerberg, N. and Oesterheld, C. (2026). [*Promises Made, Promises Kept: Safe Pareto
+Improvements via Ex Post Verifiable Commitments*](https://arxiv.org/abs/2505.00783).
+Proceedings of the AAAI Conference on Artificial Intelligence, 40(20), 17231–17241.
+doi:[10.1609/aaai.v40i20.38774](https://doi.org/10.1609/aaai.v40i20.38774) (arXiv:2505.00783).
 
 Oesterheld, Riché, Sondej, Clifton, and Conitzer (2026). [*Implementing surrogate goals for
 safer bargaining in LLM-based agents*](https://arxiv.org/abs/2604.04341) (arXiv:2604.04341).
@@ -326,8 +420,9 @@ Oesterheld and Conitzer (2021). *Safe Pareto Improvements for Delegated Game Pla
 Proceedings of the 20th International Conference on Autonomous Agents and Multiagent Systems
 (AAMAS 2021).
 
-Sistla (2025). [*Evaluating LLMs in Open-Source Games*](https://arxiv.org/abs/2512.00371)
-(introduces the SPARC benchmark; arXiv:2512.00371).
+Sistla, S. and Kleiman-Weiner, M. (2025). [*Evaluating LLMs in Open-Source
+Games*](https://arxiv.org/abs/2512.00371) (introduces the SPARC benchmark — Strategic Program
+Analysis for Reciprocal Cooperation; arXiv:2512.00371).
 
 Kokotajlo. [*The Commitment Races problem*](https://www.alignmentforum.org/posts/brXr7PJ2W4Na2EW2q/the-commitment-races-problem).
 AI Alignment Forum.
@@ -341,7 +436,10 @@ AI Alignment Forum.
 ---
 
 *Feedback is the point of posting this — especially from anyone who works on SPIs,
-commitment devices, or LLM bargaining evals. Two extensions are parked and cheap to run
-(extending the N=20 comparator cells; a second counterparty model), and I'd redo any cell
-a commenter can show is confounded. Code, data, and the full adversarial-review trail:
+commitment devices, or LLM bargaining evals. The next run is already specified and cheap
+(~$3): re-do the three unilateral cells across several valuation/baseline draws instead of
+one, under a second counterparty model family, with cell order interleaved and the design
+committed before it runs — which addresses the first, third, fourth, and sixth limitations
+above in a single pass. I'd redo any cell a commenter can show is confounded. Code, data,
+p-values, and the full adversarial-review trail:
 [github.com/MikeBoozer/negotiation-safety-layer](https://github.com/MikeBoozer/negotiation-safety-layer).*
