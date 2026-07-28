@@ -216,3 +216,79 @@ recorded facts (consistency, not independent re-labeling)". Three spots, one wor
 Function-by-function old-vs-new analyzer comparison: legacy fallback byte-exact; all h2
 consumers updated; moved mode assignment has no intervening use; load_progress 4-tuple
 call sites all updated; PRICES constants map to identical tuples; 50/50 tests re-confirmed.
+
+---
+
+# 2026-07-27 — pre-publication methods audit + three code-review passes
+
+Status: COMPLETE. Scope: the write-up's claims against the recorded data, and the analysis code
+added to support them. **This round changed two published statistics** (both toward a stronger
+result) and retracted three claims. Every number below regenerates from the committed data via
+`python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl`.
+
+## Methods audit — claims vs evidence
+
+Three claims were retracted as overstated, and four limitations added:
+
+- **H2 (enforcement vs prompting) is null.** 20/20 vs 18/19 is a one-episode difference,
+  Fisher p=0.49. Detecting a gap that small at 80% power needs ~150 episodes/arm.
+- **The bilateral-blind mechanism is unresolved.** "The disclosure was the embolder" rests on
+  2/40 vs 4/20, p=0.089 — directional, not significant.
+- **The H3 backfire needs both arms combined**; neither reaches α=0.05 alone (p=0.056, 0.106).
+- **Limitations added:** single-scenario pseudo-replication (every episode uses one scenario
+  instance, so N=20 is 20 samples of one prompt); "verifiability" is a bundle of credibility cues,
+  not an isolated factor; no pre-registration artifact (the main grid ran ~10 h before the harness
+  defining it was committed); arm is confounded with run order.
+
+## Pass 1 (medium) — 1 high, 5 medium, 4 low
+
+- **HIGH — `fisher_exact` used an absolute tie tolerance.** `p <= observed + 1e-12` is
+  scale-dependent: when the observed table's own probability falls below the slack, tables that are
+  *strictly more likely* than observed are swept into the tail. The uptake contrast was published as
+  **5.95e-13**; the correct value is **5.71e-34**, and the entire published figure was spurious
+  mass. Fixed with a relative tolerance (scipy's own `1+1e-7` convention), cross-checked against
+  `scipy.stats.fisher_exact` on every table in the run.
+- The §5 results block was hand-trimmed rather than real command output; the power figure was
+  quoted in prose but computed nowhere; the "CIs and p disagree" example did not hold on this data;
+  the uptake comparator pooled three arms and so did not isolate the disclosure it was labelled
+  with. All fixed.
+
+## Pass 2 (medium) — 1 medium, 7 low
+
+- **MEDIUM — the power figure was decided by the seed.** At 4000 draws the Monte-Carlo SE is
+  ~0.006 and true power at n=150 is ~0.812 — under two SE above the 0.80 threshold, so
+  `min_n_for_power` returned 150 on seed 0 and **200 on seed 1**. Raised to 40000 draws (~1 s),
+  stable across seeds; `alpha`/`trials`/`seed` now forward through.
+- Also: the stratified row displayed pooled counts beside a non-pooled p (now prints per-stratum
+  tables); column widths too narrow for the longest labels; docstring drift; a hardcoded stratum
+  count; a stale multiplicity figure.
+
+## Pass 3 (low) — 1 confirmed, 1 refuted
+
+- **Confirmed:** the stratified guard also gated the pre-existing pooled row, so a partial dataset
+  would drop a claim's p-value silently. The pooled row now keeps its own emptiness check.
+- **REFUTED:** that the relative tie tolerance might be too tight and understate p on symmetric
+  tables. `math.comb` is exact-integer arithmetic, so mathematically-equal tables are *bit-identical*
+  floats — there is no last-bit drift to fall outside the band. Swept all 6272 valid tables with
+  entries 0..8 against scipy: zero disagreements above 1e-9, worst deviation 5.5e-16 in both
+  directions. The concern would hold for a log-gamma implementation; it does not here. Recorded as a
+  code comment plus a symmetric-table test so it is not re-raised.
+
+## Statistical change: H3's combined test
+
+The pooled 2×2 was replaced by a **stratified exact conditional test** (the exact analogue of
+Cochran–Mantel–Haenszel; exact rather than CMH because `verifiable:unilateral` is 0/20 and a zero
+cell makes the chi-square approximation unreliable). Pooling was *conservative*: p=0.015 vs
+**0.0061**. Balanced 20/20 allocation means pooling could not have reversed the direction — the
+usual Simpson concern does not apply — but it understated the effect. Both are reported.
+
+## A note on the tests
+
+The regression test written to guard the tolerance bug was **itself defeated by the same bug
+class**: `pytest.approx` applies whichever of `rel`/`abs` is larger, and `abs` defaults to `1e-12` —
+larger than every value under test, so it silently accepted the wrong `5.95e-13`. It passed under
+mutation until `abs=0` was added. Every guard added this round is mutation-verified: the suite fails
+when the fix it protects is reverted.
+
+**Outcome:** 60 tests passing; the write-up's contrast block is verbatim command output; the
+main-grid results table is byte-identical to the originally published one.

@@ -429,7 +429,8 @@ This project implements and builds directly on published work by Sauerberg and O
 and by Oesterheld, Riché, Sondej, Clifton, and Conitzer; responsibility for any errors in
 interpreting or applying their results is mine alone. The experiment was built with AI
 assistance (Claude / Claude Code), as described in the disclosure at the top, and its code
-underwent an adversarial two-pass multi-agent review (full trail in `review-findings.md`).
+underwent an adversarial multi-agent review followed by a pre-publication methods audit and
+three further review passes (full trail in `review-findings.md`).
 No external funding supported this work.
 
 ## References
