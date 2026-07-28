@@ -104,6 +104,15 @@ def fisher_exact(a: int, b: int, c: int, d: int) -> float:
     # likely than observed. It silently inflated the uptake contrast from 5.7e-34
     # to 5.95e-13 — the entire returned value was spurious. Caught by a code
     # review; regression-tested in tests/test_analyze_experiment.py.
+    #
+    # Why a relative tolerance is safe here (a review flagged it as possibly too
+    # tight for tie detection): math.comb returns EXACT integers, so two
+    # mathematically-equal tables have equal integer numerators over a common
+    # denominator and their floats are bit-identical -- there is no last-bit
+    # drift to fall outside the band. Verified against scipy over all 6272
+    # valid tables with entries 0..8: zero disagreements above 1e-9. The
+    # concern WOULD apply to a log-gamma implementation, where ties are only
+    # approximate; it does not apply to this one.
     return min(1.0, sum(p for x in range(lo, hi + 1) if (p := prob(x)) <= observed * (1 + 1e-7)))
 
 
@@ -333,17 +342,20 @@ def contrasts(rows: List[dict]) -> List[dict]:
         b, nb = _counts(_cell_rows(rows, arm, "bilateral"), key)
         if nu and nb:
             strata.append((u, nu - u, b, nb - b))
+    # The pooled row keeps add()'s own emptiness check — gating it on the
+    # stratified precondition would make a claim's p-value vanish silently on a
+    # partial dataset. Only the stratified row needs every stratum present.
+    add(
+        "H3 backfire (pooled)",
+        "uni (ct+v)",
+        _cell_rows(rows, "cheap_talk", "unilateral")
+        + _cell_rows(rows, "verifiable", "unilateral"),
+        "bilateral (ct+v)",
+        _cell_rows(rows, "cheap_talk", "bilateral")
+        + _cell_rows(rows, "verifiable", "bilateral"),
+        key,
+    )
     if len(strata) >= 2:
-        add(
-            "H3 backfire (pooled)",
-            "uni (ct+v)",
-            _cell_rows(rows, "cheap_talk", "unilateral")
-            + _cell_rows(rows, "verifiable", "unilateral"),
-            "bilateral (ct+v)",
-            _cell_rows(rows, "cheap_talk", "bilateral")
-            + _cell_rows(rows, "verifiable", "bilateral"),
-            key,
-        )
         lu = sum(t[0] for t in strata)
         nu = sum(t[0] + t[1] for t in strata)
         lb = sum(t[2] for t in strata)

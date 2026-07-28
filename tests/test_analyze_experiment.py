@@ -230,3 +230,17 @@ def test_load_rows_pools_multiple_files(tmp_path):
     run_main(["--mock", "--out", a, "--episodes", "2", "--calibration-episodes", "1"])
     run_main(["--mock", "--out", b, "--episodes", "2", "--calibration-episodes", "1"])
     assert len(load_rows(a, b)) == len(load_rows(a)) + len(load_rows(b))
+
+
+def test_fisher_exact_detects_exact_ties_on_symmetric_tables():
+    """Guards the relative tie tolerance against being tightened unsafely.
+
+    A review suggested the relative band might exclude genuinely equal-probability
+    tables. It cannot: math.comb is exact-integer, so equal tables are bit-identical
+    floats. A symmetric table must therefore return exactly 1.0 — every table is a
+    tie with itself or its mirror, so the whole distribution is summed.
+    """
+    for t in [(4, 4, 4, 4), (5, 5, 5, 5), (10, 10, 10, 10), (20, 20, 20, 20)]:
+        assert fisher_exact(*t) == pytest.approx(1.0), t
+    # Mirrored non-symmetric pair must agree exactly, not merely closely.
+    assert fisher_exact(2, 8, 8, 2) == fisher_exact(8, 2, 2, 8)
