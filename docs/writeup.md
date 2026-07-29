@@ -194,10 +194,12 @@ mock mode runs the identical pipeline offline for $0.
 
 ## 5. Results
 
-All numbers regenerate via `python harness/analyze_experiment.py --in results/experiment.jsonl`
-(main grid: 160 live episodes, $3.43; +$0.31 pilots; +$2.10 blind-arm follow-up); adding
-`results/experiment-blind.jsonl` to the same flag pools the follow-up run and emits the
-cross-run contrasts. The p-values quoted throughout are two-sided Fisher exact, computed by
+All numbers regenerate via
+`python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl`
+(240 live episodes: main grid 160, $3.43; blind-arm follow-up 80, $2.10; +$0.31 pilots). Passing
+only `results/experiment.jsonl` reproduces the main grid alone — it omits the cross-run contrasts,
+so the uptake flip reads 39/40 vs 0/40 rather than the pooled 0/100, and the blind-mechanism tests
+do not appear at all. The p-values quoted throughout are two-sided Fisher exact, computed by
 that command rather than typed into this prose, so the inferences are as checkable as the
 rates — including the ones that came out against me:
 

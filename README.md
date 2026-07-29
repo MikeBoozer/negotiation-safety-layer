@@ -126,10 +126,15 @@ theory anchor (`nsl/games.py`, `tests/test_games.py`).
 
 ```bash
 python harness/run_experiment.py --mock      # full grid offline, $0
-python harness/analyze_experiment.py --in results/experiment.jsonl   # the recorded live run
+python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl
 ```
 
-Recorded data: `results/experiment.jsonl` (160 live episodes) + `results/pilot*.jsonl`.
+The second command reproduces every number in the write-up, across all 240 recorded live episodes.
+Passing only `results/experiment.jsonl` analyses the main grid alone and omits the cross-run
+contrasts (the uptake flip and the blind-mechanism tests).
+
+Recorded data: `results/experiment.jsonl` (160 live episodes) + `results/experiment-blind.jsonl`
+(80 episodes, the blind-ask follow-up) + `results/pilot*.jsonl`.
 Write-up: [`docs/writeup.md`](docs/writeup.md). Review paper trail: [`review-findings.md`](review-findings.md).
 
 ## Extending it
