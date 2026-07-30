@@ -8,22 +8,22 @@ reproduces every number in the write-up across 240 recorded live episodes.
 Until this test existed, the only thing standing behind that claim was a human
 remembering to re-run the command before pushing.
 
-Design notes, because each choice here replaced a weaker version:
+**The expected output is pinned here, independently of `docs/writeup.md`.**
+That direction matters and was got wrong twice:
 
-  1. **The write-up's quoted output is compared block by block, not value by
-     value.** An earlier draft asserted six p-values as substrings, which was
-     weaker than it looked: `p=8.86e-02` appearing *anywhere* satisfied
-     `value in output`, so a bug swapping two contrast labels would leave every
-     assertion green. Comparing whole lines binds each number to the contrast
-     it labels, and comparing whole blocks covers new published numbers
-     automatically rather than only the ones someone remembered to list.
+  - The first draft asserted six p-values as bare substrings. `p=8.86e-02`
+    appearing *anywhere* satisfied it, so a bug swapping two contrast labels
+    left every assertion green.
+  - The second draft over-corrected: it derived the expected values *from the
+    write-up's own fenced block*. That made the test circular — a coordinated
+    change to the analyzer and the write-up passed, and deleting a quoted line
+    silently deleted its test case rather than failing (the tell was the count
+    dropping from 33 to 32 while staying green).
 
-  2. **Recorded episodes are pinned by content hash, not row count.** Row count
-     is invariant under editing a row in place, so it could not detect the
-     thing it existed to detect.
-
-  3. **The command runs as a subprocess**, because the claim readers are given
-     is about *the command*. Importing the analyzer would test something else.
+So: `EXPECTED_OUTPUT` is the ground truth, hardcoded. The command is checked
+against it, and the write-up is checked against it. Neither is checked against
+the other. A write-up edit and an analyzer change now have to be caught
+separately, because they are separate failures.
 
 If a check fails, the fix is almost never to update the expected value. It is
 to work out what moved and whether the published write-up is now wrong.
@@ -43,9 +43,68 @@ WRITEUP = ROOT / "docs" / "writeup.md"
 MAIN_GRID = RESULTS / "experiment.jsonl"
 BLIND_ARM = RESULTS / "experiment-blind.jsonl"
 
+# Every substantive line the documented command emits (decorative rules and
+# blank lines excluded). Ground truth: not derived from anything.
+EXPECTED_OUTPUT = (
+    "Disarmament-commitment experiment",
+    "cell (arm:laterality)        n threat rate          95% CI  accept  E[ours$] deal ours$ deal theirs$",
+    "none:unilateral             20       1.000     [0.84,1.00]    0.00       0.0          -            -",
+    "none:bilateral              20       1.000     [0.84,1.00]    0.00       0.0          -            -",
+    "cheap_talk:unilateral       20       0.350     [0.18,0.57]    0.40       6.4       16.0          7.0",
+    "cheap_talk:bilateral        20       0.700     [0.48,0.85]    0.00       0.0          -            -",
+    "cheap_talk:bilateral_blind  40       0.500     [0.35,0.65]    0.28       4.4       16.1          6.9",
+    "verifiable:unilateral       20       0.000     [0.00,0.16]    0.85      13.8       16.2          6.8",
+    "verifiable:bilateral        20       0.200     [0.08,0.42]    0.20       3.2       16.0          7.0",
+    "verifiable:bilateral_blind  40       0.050     [0.01,0.17]    0.05       0.8       16.0          7.0",
+    "(H2) our compliance, scaffolded : 1.000 (n=20)   vs raw (prompt-only): 0.947 "
+    "(n=19; 1 passthrough excluded, 0 of those coercion-flagged)",
+    "(validity) cheater detection    : 1.000   (n=5, want 1.000)",
+    "(validity) checker re-check     : 0 mismatches (want 0; certifies stored verdict "
+    "== checker(stored facts))",
+    "totals: 240 episodes, est. cost $5.53, modes=['live']",
+    "contrasts (two-sided exact; Fisher unless marked STRATIFIED, which is the design-matched combined test)",
+    "  H1 gradient                                    none:uni  20/20  vs cheap_talk:uni             7/20   p=1.29e-05",
+    "  H1 gradient (decisive)                   cheap_talk:uni   7/20  vs verifiable:uni             0/20   p=8.32e-03",
+    "  H1 gradient                                    none:uni  20/20  vs verifiable:uni             0/20   p=1.45e-11",
+    "  H2 enforcement vs prompting   verifiable:uni scaffolded  20/20  vs verifiable:uni raw        18/19   p=4.87e-01",
+    "  H3 backfire (cheap_talk)                 cheap_talk:uni   7/20  vs cheap_talk:bilateral      14/20   p=5.62e-02",
+    "  H3 backfire (verifiable)                 verifiable:uni   0/20  vs verifiable:bilateral       4/20   p=1.06e-01",
+    "  H3 backfire (pooled)                         uni (ct+v)   7/40  vs bilateral (ct+v)          18/40   p=1.50e-02",
+    "  H3 backfire (STRATIFIED)              unilateral (ct+v)   7/40  vs bilateral (ct+v)          18/40   "
+    "p=6.08e-03  [strata 7/20v14/20 0/20v4/20]",
+    "  blind mechanism (verifiable)           verifiable:blind   2/40  vs verifiable:bilateral       4/20   p=8.86e-02",
+    "  blind mechanism (cheap_talk)           cheap_talk:blind  20/40  vs cheap_talk:bilateral      14/20   p=1.74e-01",
+    "  uptake (vs all asks)                   verifiable:blind  39/40  vs all other asks             0/100  p=5.71e-34",
+    "  uptake (disclosure only)               verifiable:blind  39/40  vs verifiable:bilateral       0/20   p=5.01e-15",
+)
+
+# The write-up renders these three lines trimmed rather than verbatim. Pinned
+# write-up-side so an edit to the numbers *inside them* still fails: an earlier
+# draft merely skipped them, which left three published lines unguarded.
+WRITEUP_TRIMMED_RENDERINGS = (
+    "(H2) our compliance, scaffolded : 1.000 (n=20)  vs raw (prompt-only): 0.947 "
+    "(n=19; 1 passthrough excluded, 0 coercion-flagged)",
+    "(validity) cheater detection    : 1.000   (n=5)",
+    "(validity) checker re-check     : 0 mismatches (stored verdict == checker(stored facts))",
+)
+
+# How many lines §5's fenced block quotes. Pinned because the block is parsed,
+# and a parsed expectation that shrinks when the source shrinks catches nothing.
+WRITEUP_QUOTED_LINE_COUNT = 23
+
+# APPEND-ONLY, deliberately not closed-set. These five files back every number
+# in the write-up and are frozen; a new run belongs in a NEW file and needs no
+# change here. An earlier draft also failed on any unpinned file in results/,
+# which bought little — the runner already refuses to write over an existing
+# `--out` without `--resume`, so clobbering published evidence is prevented a
+# layer down — and cost an edit on every legitimate run. Friction like that
+# trains people to edit the guard until it stops complaining, which is the last
+# habit you want around a safety check. Add an entry here only when a new file
+# becomes something the write-up cites.
+#
 # SHA-256 over LF-normalised text rather than raw bytes: git may convert line
 # endings on checkout, and a hash that depended on the platform's newline would
-# fail in CI while passing locally, which teaches people to ignore it.
+# fail in CI while passing locally, which teaches people to ignore failures.
 RECORDED_EVIDENCE = {
     "experiment.jsonl": ("272c28aa6441b96bab5b102e6b5b6cab3570a0ff78ccbbcb295631ee99483492", 160),
     "experiment-blind.jsonl": ("e6ca1da3c51fa9072593f576a8f9cfc6baa574946d43a8dc832a7e2fced7d0b1", 80),
@@ -53,31 +112,6 @@ RECORDED_EVIDENCE = {
     "pilot2.jsonl": ("e7883d0dcfd4be857eaab4ad97ca629095fbe550f1ba3ed96009ea2d4f607163", 5),
     "pilot3.jsonl": ("90581c97506a393fdac04c7a71cf55d3ca584b92767b0ff5c9524e763ae7616f", 5),
 }
-# experiment-mock.jsonl is gitignored — regenerable offline for $0, so it is not
-# evidence and is deliberately not pinned.
-UNTRACKED_RESULTS = {"experiment-mock.jsonl"}
-
-# Lines the command emits that the write-up's block renders differently. No
-# number differs in any of them; see test_writeup_block_is_verbatim_tail.
-LINES_THE_WRITEUP_TRIMS = (
-    "(H2) our compliance, scaffolded : 1.000 (n=20)   vs raw (prompt-only): "
-    "0.947 (n=19; 1 passthrough excluded, 0 of those coercion-flagged)",
-    "(validity) cheater detection    : 1.000   (n=5, want 1.000)",
-    "(validity) checker re-check     : 0 mismatches (want 0; certifies stored verdict "
-    "== checker(stored facts))",
-)
-
-# Cell rows the two-file command emits that the write-up's block omits. Pinned
-# so the gap is a known, sized quantity rather than a vague discrepancy.
-CELL_ROWS_OMITTED_FROM_WRITEUP = (
-    "cheap_talk:bilateral_blind  40       0.500     [0.35,0.65]    0.28       4.4       16.1          6.9",
-    "verifiable:bilateral_blind  40       0.050     [0.01,0.17]    0.05       0.8       16.0          7.0",
-)
-
-# Published in §5's prose rather than the fenced block ($3.43 main grid +
-# $2.10 blind arm = $5.53). Pinning the whole line is what catches an edited
-# `cost_usd_est`, which no row count or episode-count check would see.
-TOTALS_LINE = "totals: 240 episodes, est. cost $5.53, modes=['live']"
 
 
 def normalised(path: Path) -> str:
@@ -85,15 +119,25 @@ def normalised(path: Path) -> str:
 
 
 def writeup_block() -> str:
-    """The fenced block in writeup.md §5 that quotes the analyzer's output."""
+    """The fenced block in writeup.md §5 that quotes the analyzer's output.
+
+    Called inside test bodies, never at collection time: a write-up that cannot
+    be parsed must fail one test, not error the module and take the evidence
+    hash checks down with it.
+    """
     md = WRITEUP.read_text(encoding="utf-8")
-    return next(
-        b for b in re.findall(r"```\n(.*?)```", md, re.S) if "contrasts (two-sided exact" in b
-    ).strip("\n")
-
-
-def writeup_paragraphs() -> list:
-    return [p.strip("\n") for p in writeup_block().split("\n\n") if p.strip()]
+    # `[a-z]*` so a language-tagged fence anywhere in the file does not shift
+    # the open/close pairing and make the block unfindable.
+    block = next(
+        (b for b in re.findall(r"```[a-z]*\n(.*?)```", md, re.S) if "contrasts (two-sided exact" in b),
+        None,
+    )
+    if block is None:
+        pytest.fail(
+            "could not find the fenced analyzer-output block in docs/writeup.md §5. "
+            "If §5 was restructured, this test needs updating deliberately."
+        )
+    return block.strip("\n")
 
 
 @pytest.fixture(scope="module")
@@ -114,48 +158,53 @@ def analyzer_output():
     return proc.stdout
 
 
-def test_contrast_block_is_verbatim(analyzer_output):
-    """The strongest single check here: all twelve published p-values, each
-    bound to the contrast line that labels it, compared as one contiguous
-    block. A mis-attributed or reordered contrast fails this even though every
-    individual number would still appear somewhere in the output."""
-    contrasts = next(p for p in writeup_paragraphs() if p.startswith("contrasts (two-sided"))
-    assert contrasts in analyzer_output, (
-        "writeup.md §5 quotes this contrast block, but the documented command no longer "
-        "produces it verbatim. Do not edit the expected text to match. Find out what "
-        f"moved.\n\n--- expected ---\n{contrasts}\n\n--- actual ---\n{analyzer_output}"
+@pytest.mark.parametrize("line", EXPECTED_OUTPUT)
+def test_command_emits_every_pinned_line(analyzer_output, line):
+    assert line in analyzer_output, (
+        f"the documented command no longer emits this line. Do not edit the expected "
+        f"text to match. Find out what moved.\n\nexpected: {line!r}\n\n{analyzer_output}"
     )
 
 
-@pytest.mark.parametrize("line", sorted({ln for p in writeup_paragraphs() for ln in p.splitlines()}))
-def test_every_line_the_writeup_quotes_is_really_emitted(analyzer_output, line):
-    """Line-level cover for the parts of the block that are not contiguous in
-    the output (the cells table). Every quoted line must be real output."""
-    if line.startswith(("(H2)", "(validity)")):
-        pytest.skip(
-            "the write-up renders these trimmed; the real output lines are pinned by "
-            "test_trimmed_lines_still_match_the_real_output instead"
-        )
-    assert line in analyzer_output, f"write-up quotes a line the command does not emit:\n{line!r}"
+def test_command_emits_nothing_unpinned(analyzer_output):
+    """The complement of the check above: a *new* published number appearing in
+    the output must be pinned deliberately rather than drifting in unnoticed."""
+    emitted = {ln for ln in analyzer_output.splitlines() if ln.strip() and set(ln.strip()) != {"-"}}
+    assert not emitted - set(EXPECTED_OUTPUT), (
+        f"the command emits lines this test does not pin:\n"
+        + "\n".join(sorted(emitted - set(EXPECTED_OUTPUT)))
+    )
 
 
-@pytest.mark.parametrize("line", LINES_THE_WRITEUP_TRIMS)
-def test_trimmed_lines_still_match_the_real_output(analyzer_output, line):
-    assert line in analyzer_output, f"H2 / validity line changed:\n{analyzer_output}"
+def test_contrast_block_is_verbatim(analyzer_output):
+    """All twelve published p-values as one contiguous block, so a reordered or
+    mis-attributed contrast fails even though every number is still present."""
+    contrasts = "\n".join(ln for ln in EXPECTED_OUTPUT if ln.startswith(("contrasts (", "  ")))
+    assert contrasts in analyzer_output, f"contrast block changed:\n{analyzer_output}"
 
 
-@pytest.mark.parametrize("row", CELL_ROWS_OMITTED_FROM_WRITEUP)
-def test_cell_rows_the_writeup_omits_are_still_emitted(analyzer_output, row):
-    """The two blind-arm cell rows are absent from the write-up's block but are
-    real published-adjacent numbers the command emits. Pinned so they are
-    covered regardless of what the write-up chooses to show."""
-    assert row in analyzer_output, f"blind-arm cell row changed:\n{analyzer_output}"
+def test_writeup_quotes_only_real_output():
+    """Every line §5 quotes must be either real command output or one of the
+    three documented trimmed renderings. Nothing is skipped, so falsifying a
+    quoted number fails here rather than passing silently."""
+    quoted = [ln for ln in writeup_block().splitlines() if ln.strip()]
+    allowed = set(EXPECTED_OUTPUT) | set(WRITEUP_TRIMMED_RENDERINGS)
+    invented = [ln for ln in quoted if ln not in allowed]
+    assert not invented, (
+        "docs/writeup.md §5 quotes lines that are neither real command output nor a "
+        "documented trimmed rendering:\n" + "\n".join(repr(ln) for ln in invented)
+    )
 
 
-def test_totals_line_including_cost(analyzer_output):
-    """Whole line, not just the episode count: an edit to any row's
-    `cost_usd_est` moves the cost and nothing else would notice."""
-    assert TOTALS_LINE in analyzer_output, analyzer_output
+def test_writeup_still_quotes_every_line_it_used_to():
+    """Guards deletion. Parametrizing over parsed content cannot catch this —
+    removing a quoted line removes its test case and the suite stays green with
+    a quietly smaller count."""
+    quoted = [ln for ln in writeup_block().splitlines() if ln.strip()]
+    assert len(quoted) == WRITEUP_QUOTED_LINE_COUNT, (
+        f"§5's block quotes {len(quoted)} lines, expected {WRITEUP_QUOTED_LINE_COUNT}. "
+        f"If lines were added or removed on purpose, update the count deliberately."
+    )
 
 
 @pytest.mark.xfail(
@@ -168,8 +217,8 @@ def test_totals_line_including_cost(analyzer_output):
         "output -- but the provenance claim is not. The caption compounds it by explaining the "
         "difference as 'the cells table is from the main-grid file alone', which misstates what "
         "the two-file command emits. Fix by regenerating the block from real output (and "
-        "rewording the caption), then delete this xfail. Until then the granular tests above "
-        "carry the actual coverage."
+        "rewording the caption), then delete this xfail. Until then the checks above carry the "
+        "actual coverage."
     ),
 )
 def test_writeup_block_is_verbatim_tail(analyzer_output):
@@ -181,16 +230,11 @@ def test_recorded_episodes_are_unedited(name):
     expected_hash, expected_rows = RECORDED_EVIDENCE[name]
     text = normalised(RESULTS / name)
     rows = len([line for line in text.splitlines() if line.strip()])
+    # Asserted, not merely interpolated into the message below: an unasserted
+    # "expected" is worse than none, because it misleads whoever is debugging.
+    assert rows == expected_rows, f"{name} has {rows} rows, expected {expected_rows}"
     assert hashlib.sha256(text.encode()).hexdigest() == expected_hash, (
-        f"{name} changed ({rows} rows, expected {expected_rows}). Recorded episodes are "
-        f"evidence: append new runs to a new file rather than editing this one. If the "
-        f"change is deliberate, the write-up almost certainly needs updating too."
+        f"{name} backs published numbers and is frozen. Put a new run in a new file "
+        f"(that needs no change here) rather than editing this one. If the edit is "
+        f"deliberate, the write-up almost certainly needs updating too."
     )
-
-
-def test_no_unpinned_results_file_appears():
-    """A new file in results/ has to be a deliberate act: pin it as evidence,
-    or add it to the untracked set."""
-    present = {p.name for p in RESULTS.glob("*.jsonl")}
-    unaccounted = present - set(RECORDED_EVIDENCE) - UNTRACKED_RESULTS
-    assert not unaccounted, f"unpinned results files: {sorted(unaccounted)}"
