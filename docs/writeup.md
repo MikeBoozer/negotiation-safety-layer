@@ -197,11 +197,11 @@ mock mode runs the identical pipeline offline for $0.
 All numbers regenerate via
 `python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl`
 (240 live episodes: main grid 160, $3.43; blind-arm follow-up 80, $2.10; +$0.31 pilots). Passing
-only `results/experiment.jsonl` reproduces the main grid alone — it omits the cross-run contrasts,
-so the uptake flip reads 39/40 vs 0/40 rather than the pooled 0/100, and the blind-mechanism tests
-do not appear at all. The p-values quoted throughout are two-sided Fisher exact, computed by
-that command rather than typed into this prose, so the inferences are as checkable as the
-rates — including the ones that came out against me:
+only `results/experiment.jsonl` reproduces the main grid alone: the two `bilateral_blind` rows drop
+out of the cells table, and the last four contrasts — both blind-mechanism tests and both uptake
+tests — do not appear at all, since each of them spans the two runs. The p-values quoted throughout
+are two-sided Fisher exact, computed by that command rather than typed into this prose, so the
+inferences are as checkable as the rates — including the ones that came out against me:
 
 ```
 cell (arm:laterality)        n threat rate          95% CI  accept  E[ours$] deal ours$ deal theirs$
@@ -209,13 +209,16 @@ none:unilateral             20       1.000     [0.84,1.00]    0.00       0.0    
 none:bilateral              20       1.000     [0.84,1.00]    0.00       0.0          -            -
 cheap_talk:unilateral       20       0.350     [0.18,0.57]    0.40       6.4       16.0          7.0
 cheap_talk:bilateral        20       0.700     [0.48,0.85]    0.00       0.0          -            -
+cheap_talk:bilateral_blind  40       0.500     [0.35,0.65]    0.28       4.4       16.1          6.9
 verifiable:unilateral       20       0.000     [0.00,0.16]    0.85      13.8       16.2          6.8
 verifiable:bilateral        20       0.200     [0.08,0.42]    0.20       3.2       16.0          7.0
-
-(H2) our compliance, scaffolded : 1.000 (n=20)  vs raw (prompt-only): 0.947 (n=19; 1 passthrough excluded, 0 coercion-flagged)
-(validity) cheater detection    : 1.000   (n=5)
-(validity) checker re-check     : 0 mismatches (stored verdict == checker(stored facts))
-
+verifiable:bilateral_blind  40       0.050     [0.01,0.17]    0.05       0.8       16.0          7.0
+----------------------------------------------------------------------------------------------
+(H2) our compliance, scaffolded : 1.000 (n=20)   vs raw (prompt-only): 0.947 (n=19; 1 passthrough excluded, 0 of those coercion-flagged)
+(validity) cheater detection    : 1.000   (n=5, want 1.000)
+(validity) checker re-check     : 0 mismatches (want 0; certifies stored verdict == checker(stored facts))
+totals: 240 episodes, est. cost $5.53, modes=['live']
+----------------------------------------------------------------------------------------------
 contrasts (two-sided exact; Fisher unless marked STRATIFIED, which is the design-matched combined test)
   H1 gradient                                    none:uni  20/20  vs cheap_talk:uni             7/20   p=1.29e-05
   H1 gradient (decisive)                   cheap_talk:uni   7/20  vs verifiable:uni             0/20   p=8.32e-03
@@ -229,11 +232,11 @@ contrasts (two-sided exact; Fisher unless marked STRATIFIED, which is the design
   blind mechanism (cheap_talk)           cheap_talk:blind  20/40  vs cheap_talk:bilateral      14/20   p=1.74e-01
   uptake (vs all asks)                   verifiable:blind  39/40  vs all other asks             0/100  p=5.71e-34
   uptake (disclosure only)               verifiable:blind  39/40  vs verifiable:bilateral       0/20   p=5.01e-15
+----------------------------------------------------------------------------------------------
 ```
 
-*(That block is the verbatim tail of the two-file command above — the cells table is from the
-main-grid file alone, so running the one-file command shows the table without the blind rows or
-the blind contrasts.)*
+*(That block is the verbatim tail of the two-file command above, reproduced byte for byte — a test
+in the repo fails if it ever stops matching.)*
 
 Two notes on how to read it. First, **Wilson-interval disjointness is a conservative eyeball
 test, not a hypothesis test** — on this data the two never actually conflict, but where they

@@ -4,31 +4,26 @@
 
     python harness/analyze_experiment.py --in results/experiment.jsonl results/experiment-blind.jsonl
 
-reproduces every number in the write-up across 240 recorded live episodes.
-Until this test existed, the only thing standing behind that claim was a human
-remembering to re-run the command before pushing.
+reproduces every number in the write-up across 240 recorded live episodes, and
+§5 quotes the command's tail verbatim. Until this test existed, the only thing
+standing behind either claim was a human remembering to re-run the command.
 
 **Everything is pinned as an exact sequence, and nothing is derived from
 anything else.** Three review rounds each found the same shape of defect here —
-a check that looked stronger than it was — and each fix narrowed the gap:
+a check that read stronger than it was — and each fix narrowed the gap:
 
   - Six p-values as bare substrings. `p=8.86e-02` appearing *anywhere*
     satisfied it, so swapping two contrast labels left the suite green.
   - Expectations derived from the write-up's own block, which made the test
     circular and meant deleting a quoted line deleted its test case.
   - A line *count* to catch deletion. It caught shrinkage, not substitution:
-    replacing one quoted contrast with a duplicate of another kept the count at
-    23 and stayed green while a published p-value vanished from §5.
+    replacing one quoted contrast with a duplicate of another kept the count
+    unchanged while a published p-value vanished from §5.
 
-The through-line is that set membership and cardinality are both weaker than
-they read. So both the command's output and the write-up's quotation of it are
-now pinned as ordered tuples and compared with `==`. That one assertion
-subsumes presence, absence, ordering, and duplication, and it is why this file
-has fewer tests than it used to rather than more.
-
-Ground truth is `EXPECTED_OUTPUT`. The command is checked against it and the
-write-up is checked against it; neither is checked against the other, because
-they are separate failures.
+The through-line is that set membership and cardinality both read stronger than
+they are. So `EXPECTED_OUTPUT` is hardcoded ground truth, and both the command
+and the write-up are compared against it as ordered sequences — one assertion
+each, subsuming presence, absence, ordering and duplication.
 
 Note the limit of all this: it proves nothing has *drifted*. It cannot prove
 the numbers were right to begin with — that comes from the 2026-07-27 audit,
@@ -98,37 +93,12 @@ CONTRASTS_BLOCK = (
 
 EXPECTED_OUTPUT = BANNER + CELLS_BLOCK + SUMMARY_BLOCK + CONTRASTS_BLOCK
 
-# --- What docs/writeup.md §5 quotes, as an exact ordered sequence. ------------
-# Compared with `==`, so a substituted, duplicated, reordered, or deleted line
-# all fail. Every entry must also be real output or a documented trimmed
-# rendering — enforced by test_pinned_quotes_are_anchored_to_real_output, so
-# this tuple cannot become a private truth of its own.
-WRITEUP_QUOTED_LINES = (
-    "cell (arm:laterality)        n threat rate          95% CI  accept  E[ours$] deal ours$ deal theirs$",
-    "none:unilateral             20       1.000     [0.84,1.00]    0.00       0.0          -            -",
-    "none:bilateral              20       1.000     [0.84,1.00]    0.00       0.0          -            -",
-    "cheap_talk:unilateral       20       0.350     [0.18,0.57]    0.40       6.4       16.0          7.0",
-    "cheap_talk:bilateral        20       0.700     [0.48,0.85]    0.00       0.0          -            -",
-    "verifiable:unilateral       20       0.000     [0.00,0.16]    0.85      13.8       16.2          6.8",
-    "verifiable:bilateral        20       0.200     [0.08,0.42]    0.20       3.2       16.0          7.0",
-    "(H2) our compliance, scaffolded : 1.000 (n=20)  vs raw (prompt-only): 0.947 "
-    "(n=19; 1 passthrough excluded, 0 coercion-flagged)",
-    "(validity) cheater detection    : 1.000   (n=5)",
-    "(validity) checker re-check     : 0 mismatches (stored verdict == checker(stored facts))",
-) + CONTRASTS_BLOCK
-
-# The three lines §5 renders trimmed rather than verbatim, each mapped to the
-# real output line it stands for. Mapping rather than listing so the trimming
-# can be checked to be *cosmetic*: an unanchored allowlist would let someone
-# fix a failing test by pasting a mistyped number into it, which is the one
-# "edit the guard until it goes green" path the rest of this file closes.
-WRITEUP_TRIMS = {
-    "(H2) our compliance, scaffolded : 1.000 (n=20)  vs raw (prompt-only): 0.947 "
-    "(n=19; 1 passthrough excluded, 0 coercion-flagged)": SUMMARY_BLOCK[0],
-    "(validity) cheater detection    : 1.000   (n=5)": SUMMARY_BLOCK[1],
-    "(validity) checker re-check     : 0 mismatches "
-    "(stored verdict == checker(stored facts))": SUMMARY_BLOCK[2],
-}
+# §5 quotes the command's tail: everything from the cells header onward, which
+# is EXPECTED_OUTPUT minus the banner. Since 2026-07-30 that is byte-exact — it
+# previously spliced the ONE-file cells table onto the TWO-file contrasts while
+# calling itself verbatim, which is what test_writeup_block_is_verbatim_tail
+# now holds it to.
+WRITEUP_QUOTED_BLOCK = CELLS_BLOCK + SUMMARY_BLOCK + CONTRASTS_BLOCK
 
 # --- Recorded evidence. -------------------------------------------------------
 # APPEND-ONLY, deliberately not closed-set. These five files back every number
@@ -154,13 +124,9 @@ def normalised(path: Path) -> str:
     return "\n".join(path.read_text(encoding="utf-8").splitlines())
 
 
-def numbers_in(line: str) -> list:
-    return re.findall(r"\d+(?:\.\d+)?(?:e[-+]?\d+)?", line)
-
-
-def is_subsequence(small: list, large: list) -> bool:
-    it = iter(large)
-    return all(token in it for token in small)
+def substantive(text: str) -> list:
+    """Lines that carry content: blanks and horizontal rules dropped."""
+    return [ln for ln in text.splitlines() if ln.strip() and set(ln.strip()) != {"-"}]
 
 
 def writeup_block() -> str:
@@ -213,7 +179,7 @@ def analyzer_output():
 def test_command_output_is_exactly_as_pinned(analyzer_output):
     """Ordered equality over every substantive line: presence, absence,
     ordering and duplication in one assertion."""
-    emitted = [ln for ln in analyzer_output.splitlines() if ln.strip() and set(ln.strip()) != {"-"}]
+    emitted = substantive(analyzer_output)
     assert emitted == list(EXPECTED_OUTPUT), (
         "the documented command's output no longer matches what is pinned here. Do not "
         "edit the expected text to match. Find out what moved.\n\n"
@@ -236,58 +202,32 @@ def test_block_is_contiguous_and_in_order(analyzer_output, block, name):
     assert "\n".join(block) in analyzer_output, f"{name} rows reordered or changed"
 
 
-def test_writeup_quotes_match_exactly():
-    """Ordered equality against the pinned quotation. A line deleted, added,
-    reordered, or swapped for a duplicate of another all fail here — a bare
-    count caught only the first of those."""
-    quoted = [ln for ln in writeup_block().splitlines() if ln.strip()]
-    assert quoted == list(WRITEUP_QUOTED_LINES), (
-        "docs/writeup.md §5 no longer quotes what is pinned here.\n\nonly in write-up: "
-        f"{[l for l in quoted if l not in WRITEUP_QUOTED_LINES]}\n\nonly in pin: "
-        f"{[l for l in WRITEUP_QUOTED_LINES if l not in quoted]}"
-    )
-
-
-@pytest.mark.parametrize("line", WRITEUP_QUOTED_LINES)
-def test_pinned_quotes_are_anchored_to_real_output(line):
-    """Every pinned quotation is real command output, or a trimmed rendering of
-    one. Without this the quotation tuple could drift into a private truth."""
-    assert line in EXPECTED_OUTPUT or line in WRITEUP_TRIMS, (
-        f"pinned write-up quote is neither real output nor a documented trim:\n{line!r}"
-    )
-
-
-@pytest.mark.parametrize("trimmed", sorted(WRITEUP_TRIMS))
-def test_trims_are_cosmetic_only(trimmed):
-    """The trimming may drop words; it may not change a number. Checked by
-    requiring the trimmed line's numeric tokens to be a subsequence of the real
-    line's, so `1.000 (n=5)` is allowed to stand for `1.000 (n=5, want 1.000)`
-    while `0.200 (n=500)` is not."""
-    real = WRITEUP_TRIMS[trimmed]
-    assert real in EXPECTED_OUTPUT, f"trim maps to a line that is not real output:\n{real!r}"
-    assert is_subsequence(numbers_in(trimmed), numbers_in(real)), (
-        f"a trimmed write-up line changes a number rather than only shortening text:\n"
-        f"  write-up: {trimmed!r} -> {numbers_in(trimmed)}\n"
-        f"  real    : {real!r} -> {numbers_in(real)}"
-    )
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "writeup.md §5 calls its fenced block 'the verbatim tail of the two-file command', "
-        "but the block splices the ONE-file cells table (6 rows) onto the TWO-file contrasts; "
-        "the two-file command emits 8 cell rows, and three H2/validity lines are cosmetically "
-        "trimmed. No published number is wrong -- every quoted row is byte-identical to real "
-        "output -- but the provenance claim is not. The caption compounds it by explaining the "
-        "difference as 'the cells table is from the main-grid file alone', which misstates what "
-        "the two-file command emits. Fix by regenerating the block from real output (and "
-        "rewording the caption), then delete this xfail and WRITEUP_TRIMS. Until then the checks "
-        "above carry the actual coverage."
-    ),
-)
 def test_writeup_block_is_verbatim_tail(analyzer_output):
-    assert writeup_block() in analyzer_output
+    """§5 calls its fenced block 'the verbatim tail of the two-file command'.
+    This is that claim, checked as one contiguous substring — so a line edited,
+    added, removed, reordered or duplicated all fail here.
+
+    It was an `xfail` until 2026-07-30, when the block was regenerated from
+    real output: it had spliced the ONE-file cells table (6 rows) onto the
+    TWO-file contrasts, which emit 8, and trimmed three H2/validity lines. No
+    published number was wrong, but the provenance claim was.
+    """
+    assert writeup_block() in analyzer_output, (
+        "docs/writeup.md §5 no longer quotes the command's tail verbatim, and §5 says it "
+        "does. Regenerate the block from real output rather than relaxing this test.\n\n"
+        f"--- §5 quotes ---\n{writeup_block()}\n\n--- command emits ---\n{analyzer_output}"
+    )
+
+
+def test_writeup_quotes_the_whole_tail():
+    """The verbatim check above passes on any contiguous *slice*, so it would
+    not notice §5 quietly dropping the last few contrasts. This pins the whole
+    quotation as an ordered sequence."""
+    assert substantive(writeup_block()) == list(WRITEUP_QUOTED_BLOCK), (
+        "docs/writeup.md §5 quotes a different set of lines than expected.\n\nonly in §5: "
+        f"{[l for l in substantive(writeup_block()) if l not in WRITEUP_QUOTED_BLOCK]}\n\n"
+        f"missing from §5: {[l for l in WRITEUP_QUOTED_BLOCK if l not in substantive(writeup_block())]}"
+    )
 
 
 @pytest.mark.parametrize("name", sorted(RECORDED_EVIDENCE))
