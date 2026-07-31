@@ -186,8 +186,11 @@ the Wilson intervals and p-values below describe how much the model's behavior v
 re-run the same situation, and the effective scenario-level N of this whole experiment is **1**.
 That is enough to establish that the framing changes behavior *in this situation* — which is
 what H1 asks — and is not enough to estimate an effect size for negotiations in general.
-Varying valuation and baseline is the top item in §6's list of what to fix next; it costs no
-more API budget than the run already reported, since it is a re-allocation of the same episodes.
+Raising that scenario-level N is the top item in §6's list of what to fix next, and it means
+varying the *situation* — distinct negotiation contexts — not just the numbers inside this one:
+re-drawing valuation and baseline would retire "at these numbers" and leave "in this OTC setup"
+standing, with the scenario-level N still 1. It costs no more API budget than the run already
+reported, since it is a re-allocation of the same episodes.
 
 **Cost & reproducibility.** Whole experiment under a hard $15 cap enforced by a budget guard;
 mock mode runs the identical pipeline offline for $0.
@@ -473,10 +476,12 @@ AI Alignment Forum.
 ---
 
 *Feedback is the point of posting this — especially from anyone who works on SPIs,
-commitment devices, or LLM bargaining evals. The next run is already specified and cheap
-(~$3): re-do the three unilateral cells across several valuation/baseline draws instead of
-one, under a second counterparty model family, with cell order interleaved and the design
-committed before it runs — which addresses the first, third, fourth, and sixth limitations
-above in a single pass. I'd redo any cell a commenter can show is confounded. Code, data,
+commitment devices, or LLM bargaining evals. The next run is already specified, and inexpensive at
+the costs reported in §5: re-do the three unilateral cells across a grid of distinct negotiation
+situations instead of one — not merely re-drawn valuation/baseline numbers, which would leave the
+scenario-level N at 1 — under a second counterparty model family, with cell order interleaved and
+the design committed before it runs, which retires four of the limitations above in a single pass:
+the single scenario, the missing pre-registration artifact, the arm/run-order confound, and the
+single model family. I'd redo any cell a commenter can show is confounded. Code, data,
 p-values, and the full adversarial-review trail:
 [github.com/MikeBoozer/negotiation-safety-layer](https://github.com/MikeBoozer/negotiation-safety-layer).*
