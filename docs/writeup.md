@@ -365,9 +365,14 @@ and the primary instrument is held fixed across arms.
   128 / baseline 120 / size 500, so each cell is one prompt sampled 20 (or 40) times and the
   scenario-level N of the entire experiment is 1 (see §4). Nothing here separates "verifiable
   framing deters coercion" from "verifiable framing deters coercion *in this OTC setup at
-  these numbers*." This is the limitation I'd fix first, and it is nearly free: re-running the
-  three unilateral cells across a handful of valuation/baseline draws costs the same API budget
-  as the run already reported.
+  these numbers*." This is the limitation I'd fix first, and the API budget for it is small —
+  re-running the three unilateral cells across a scenario grid costs about what the run already
+  reported. The trap is that varying the *numbers* would not do it: a handful of
+  valuation/baseline draws retires "at these numbers" and leaves "in this OTC setup" standing.
+  The scenario-level N that matters counts situations, not numeric draws on one — which is how
+  the comparison class buys its generalization (Oesterheld et al. 2026 evaluate on 101 distinct
+  scenarios, and state that the numeric parameters they built into them go unused in their
+  reported results). What I run next varies the negotiation context itself.
 - **"Verifiability" is a bundle, not an isolated factor.** Arm C adds five things at once over
   arm B — cryptographic signing, a neutral third-party auditor, ex-post checkability, stated
   reputational/enforcement consequences, and a visible HMAC line. "The counterparty responds to

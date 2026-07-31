@@ -38,12 +38,24 @@ which is why this rule is now first.
 The methodology literature treats items and prompt wording as **random factors, not fixed**
 ([arXiv:2604.11581](https://arxiv.org/abs/2604.11581)): standard CIs that ignore item and prompt
 variance **under-cover, and get worse as N grows** (95% nominal → 91–93% actual; naive standard
-errors 40–60% too small). The same work finds **doubling the number of items is the largest single
-variance reduction available (−38.7%)** — more than any other design change tested.
+errors 40–60% too small). Its budget-allocation study directs spend **toward more items first**,
+finding that a naive allocation "wastes two-thirds of calls on replications that provide negligible
+returns". Note its own two caveats: replications are negligible only **at R ≥ 3**, and while the
+*ordering* (items before replications) "transfers across domains and scoring methods", the
+*magnitudes* do not — its two published projections for doubling items are −31% and −47.5% in
+different scoring designs, so no single figure should be quoted as a constant.
 
-**Therefore: spend the marginal dollar on more scenarios and more model families, not more
-repetitions of the same cell.** Report the design as `S scenarios × M models × R repetitions`, never
+**Therefore: spend the marginal dollar on more scenarios and more model families — not on
+repetitions beyond R≈3.** Report the design as `S scenarios × M models × R repetitions`, never
 as a bare N.
+
+**Two limits on what that buys.** More items improves *precision*, not *validity*: error bars
+"cannot extrapolate beyond the item population named by" the sampling frame, so varying numeric
+parameters of one prompt generalizes only to numeric parameters of that prompt — vary the
+*situation* if you want a claim about situations. And at small N use **Wilson or Bayesian
+intervals, never CLT/normal-approximation ones**: CLT intervals shrink toward zero width as a rate
+approaches 0 or 1, which is exactly where near-floor/ceiling designs live ([Bowyer, Aitchison &
+Ivanova, ICML'25, arXiv:2503.01747](https://arxiv.org/abs/2503.01747)).
 
 ## The sample-size rule (answers "is N=40 enough?")
 
