@@ -5,8 +5,15 @@ counterparties x scaffolds), one JSONL row per episode.
   python harness/run_experiment.py --episodes 20           # LIVE (key + budget cap)
   python harness/run_experiment.py --cells none:unilateral:llm:full --episodes 5
   python harness/run_experiment.py --resume                # continue an interrupted file
+  python harness/run_experiment.py --order blocked         # original cell-major order
 
-Exit codes: 0 done; 2 output-file/CLI misuse; 3 budget cap reached (file stays
+Writes two files: the episode rows to --out, and a per-LLM-call transcript
+(full prompts, raw responses, served model snapshot, request ids) to the
+sidecar --calls-out, which defaults to <out>.calls.jsonl. The sidecar is where
+everything that cannot be re-derived after a live run goes; keeping it out of
+the episode file leaves that file diffable.
+
+Exit codes: 0 done; 2 output-file/CLI misuse; 3 budget cap reached (files stay
 valid and resumable). Design: harness/arms.py (framing), nsl/disarmament.py
 (commitments + ex post checker), tests/test_games.py (theory anchor),
 harness/analyze_experiment.py (all analysis — this file only records).
@@ -16,10 +23,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -85,6 +93,38 @@ def default_grid(episodes: int, calibration_episodes: int) -> List[Cell]:
     ]
     cells.append(Cell("verifiable", "bilateral", "cheater", "full", calibration_episodes))
     return cells
+
+
+def episode_slots(grid: List[Cell], order: str, seed: int) -> List[Tuple[Cell, int]]:
+    """The (cell, episode_index) sequence the run executes, in order.
+
+    'interleaved' (default) is episode-major: every cell's episode i runs
+    before any cell's episode i+1, and the cells within a wave are shuffled by
+    `seed`. That spreads each arm across the whole run instead of blocking it
+    into one contiguous window, which is what closes the arm-confounded-with-
+    run-order gap documented in docs/writeup.md §6 — the main grid ran all 160
+    episodes in fixed cell order across 43 minutes, so endpoint drift is not
+    excluded by the design. Interleaving is free; not doing it was the mistake.
+
+    'blocked' is the original cell-major order, kept so the published runs stay
+    reproducible rather than only describable.
+
+    Order is a pure function of (grid, order, seed) and every row records all
+    three, so the sequence regenerates without re-running the experiment. Resume
+    keys off (cell_id, episode_index), which is order-independent — an
+    interrupted interleaved run resumes correctly.
+    """
+    if order == "blocked":
+        return [(cell, i) for cell in grid for i in range(cell.episodes)]
+    if order != "interleaved":
+        raise ValueError(f"unknown order {order!r} (expected 'interleaved' or 'blocked')")
+    rng = random.Random(seed)
+    slots: List[Tuple[Cell, int]] = []
+    for index in range(max((c.episodes for c in grid), default=0)):
+        wave = [c for c in grid if index < c.episodes]
+        rng.shuffle(wave)
+        slots += [(cell, index) for cell in wave]
+    return slots
 
 
 def make_counterparty(kind: str, llm) -> CounterpartyAgent:
@@ -215,6 +255,30 @@ def run_episode(cell: Cell, index: int, layer, scenario, llm) -> Dict:
     }
 
 
+def calls_sidecar_path(out_path: str) -> str:
+    """Per-call transcript file that pairs with --out: a/b.jsonl -> a/b.calls.jsonl."""
+    base, ext = os.path.splitext(out_path)
+    return f"{base}.calls{ext or '.jsonl'}"
+
+
+# Per-call fields small enough to carry in the episode row itself; the prompts
+# and raw response text stay in the sidecar.
+CALL_SUMMARY_FIELDS = (
+    "model_requested",
+    "model_served",
+    "stop_reason",
+    "request_id",
+    "schema_props",
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+)
+
+
+def call_summary(calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [{k: c.get(k) for k in CALL_SUMMARY_FIELDS} for c in calls]
+
+
 def load_progress(path: str) -> Tuple[Set[Tuple[str, int]], float, Optional[str], Set[str]]:
     """Completed (cell_id, episode_index) pairs, cumulative estimated spend,
     the original run_id, and the set of modes seen — the resume ledger."""
@@ -244,6 +308,19 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--cap-usd", type=float, default=EXPERIMENT_BUDGET_CAP_USD)
     ap.add_argument("--cells", default=None, help="comma-separated cell_id filter")
     ap.add_argument("--resume", action="store_true", help="continue an existing --out file")
+    ap.add_argument(
+        "--order",
+        choices=("interleaved", "blocked"),
+        default="interleaved",
+        help="episode order: interleaved spreads each arm across the run (default); "
+        "blocked is the original cell-major order",
+    )
+    ap.add_argument("--order-seed", type=int, default=0, help="seed for the interleaved order")
+    ap.add_argument(
+        "--calls-out",
+        default=None,
+        help="per-call transcript sidecar (default: <out>.calls.jsonl)",
+    )
     args = ap.parse_args(argv)
 
     grid = default_grid(args.episodes, args.calibration_episodes)
@@ -279,41 +356,72 @@ def main(argv: Optional[List[str]] = None) -> None:
             os.makedirs(out_dir, exist_ok=True)
     run_id = run_id or datetime.now(timezone.utc).isoformat()
 
+    # `client` is the innermost LLM: it owns the per-call transcript buffer.
+    # MeteredLLM wraps it for cost, so keep both references.
     if args.mock:
-        llm, metered, guard = MockLLM(mock_handler), None, None
+        client = MockLLM(mock_handler)
+        llm, metered, guard = client, None, None
     else:
-        metered = MeteredLLM(AnthropicLLM())
+        client = AnthropicLLM()
+        metered = MeteredLLM(client)
         llm = metered
         guard = BudgetGuard(args.cap_usd, already_spent=already_spent)
         print(f"live mode: cap ${args.cap_usd:.2f}, already spent ${already_spent:.2f} (resume ledger)")
 
     scenario = OTCScenario()
     layer = build_layer(llm, scenario)
+    slots = episode_slots(grid, args.order, args.order_seed)
+    calls_path = args.calls_out or calls_sidecar_path(args.out)
 
     written = 0
     try:
-        with open(args.out, "a", encoding="utf-8", newline="\n") as out:
-            for cell in grid:
-                for index in range(cell.episodes):
-                    if (cell.cell_id, index) in completed:
-                        continue
-                    if guard:
-                        guard.check_or_raise()
-                    row = run_episode(cell, index, layer, scenario, llm)
-                    cost = metered.take_delta() if metered else 0.0
-                    if guard:
-                        guard.record(cost)
-                    row.update(
+        with open(args.out, "a", encoding="utf-8", newline="\n") as out, open(
+            calls_path, "a", encoding="utf-8", newline="\n"
+        ) as calls_out:
+            for order_index, (cell, index) in enumerate(slots):
+                if (cell.cell_id, index) in completed:
+                    continue
+                if guard:
+                    guard.check_or_raise()
+                client.take_calls()  # discard anything a failed episode left behind
+                row = run_episode(cell, index, layer, scenario, llm)
+                calls = client.take_calls()
+                cost = metered.take_delta() if metered else 0.0
+                if guard:
+                    guard.record(cost)
+                ts = datetime.now(timezone.utc).isoformat()
+                row.update(
+                    {
+                        "run_id": run_id,
+                        "ts": ts,
+                        "mode": mode,
+                        "cost_usd_est": round(cost, 6),
+                        # Position in the executed sequence + the parameters that
+                        # generated it, so run-order effects are testable after
+                        # the fact rather than only speculated about.
+                        "run_order": order_index,
+                        "order_mode": args.order,
+                        "order_seed": args.order_seed,
+                        "llm_calls": call_summary(calls),
+                    }
+                )
+                out.write(json.dumps(row) + "\n")
+                out.flush()
+                calls_out.write(
+                    json.dumps(
                         {
                             "run_id": run_id,
-                            "ts": datetime.now(timezone.utc).isoformat(),
-                            "mode": mode,
-                            "cost_usd_est": round(cost, 6),
+                            "ts": ts,
+                            "cell_id": cell.cell_id,
+                            "episode_index": index,
+                            "run_order": order_index,
+                            "calls": calls,
                         }
                     )
-                    out.write(json.dumps(row) + "\n")
-                    out.flush()
-                    written += 1
+                    + "\n"
+                )
+                calls_out.flush()
+                written += 1
     except BudgetExceeded as e:
         print(
             f"BUDGET STOP: {e}\nRows written this run: {written}. The file remains valid; "
@@ -323,7 +431,8 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     spent = guard.spent if guard else 0.0
     print(
-        f"done: wrote {written} episode rows to {args.out} ({mode} mode); "
+        f"done: wrote {written} episode rows to {args.out} "
+        f"(+ per-call transcripts to {calls_path}, {mode} mode, {args.order} order); "
         f"cumulative estimated spend ${spent:.2f}"
     )
 

@@ -7,7 +7,14 @@ import pytest
 from counterparties.llm_counterparty import CP_RULES_SCHEMA, CP_TURN_SCHEMA
 from harness.budget import BudgetExceeded, BudgetGuard, MeteredLLM
 from harness.mock_brain import component_of, mock_handler
-from harness.run_experiment import Cell, load_progress, main, run_episode
+from harness.run_experiment import (
+    Cell,
+    default_grid,
+    episode_slots,
+    load_progress,
+    main,
+    run_episode,
+)
 from nsl.detector import DETECTOR_SCHEMA
 from nsl.factory import build_layer
 from nsl.llm import MockLLM
@@ -116,6 +123,69 @@ def test_resume_refuses_mode_mismatch(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main(["--resume", "--out", out, "--episodes", "2", "--calibration-episodes", "1"])
     assert exc.value.code == 2
+
+
+def test_interleaving_runs_the_same_episodes_as_blocked_order():
+    """Order is a permutation, not a filter: nothing added, dropped, or run
+    twice. This is also what makes resume order-independent, since resume keys
+    off the (cell_id, episode_index) pairs this set contains."""
+    grid = default_grid(episodes=20, calibration_episodes=5)
+    blocked = episode_slots(grid, "blocked", seed=0)
+    woven = episode_slots(grid, "interleaved", seed=0)
+    key = lambda slots: sorted((c.cell_id, i) for c, i in slots)  # noqa: E731
+    assert key(woven) == key(blocked)
+    assert len(woven) == len(set(key(woven)))
+
+
+def test_interleaving_breaks_up_the_contiguous_per_arm_blocks():
+    """The confound this exists to fix: in the published main grid every arm
+    ran in one contiguous window, so endpoint drift over the run is not
+    excluded. Under interleaving each arm must be spread across the sequence."""
+    grid = [c for c in default_grid(20, 5) if c.counterparty == "llm"]
+    woven = episode_slots(grid, "interleaved", seed=0)
+    positions = {}
+    for pos, (cell, _) in enumerate(woven):
+        positions.setdefault(cell.arm, []).append(pos)
+    for arm, pos in positions.items():
+        contiguous = pos == list(range(pos[0], pos[0] + len(pos)))
+        assert not contiguous, f"{arm} still ran as one block"
+        assert max(pos) - min(pos) > len(woven) // 2, f"{arm} is clustered in one window"
+    # And the blocked order is exactly what it is supposed to be: contiguous.
+    blocked_pos = [p for p, (c, _) in enumerate(episode_slots(grid, "blocked", 0)) if c.arm == "none"]
+    assert blocked_pos == list(range(blocked_pos[0], blocked_pos[0] + len(blocked_pos)))
+
+
+def test_interleaving_is_episode_major_and_seed_deterministic():
+    grid = default_grid(episodes=3, calibration_episodes=2)
+    woven = episode_slots(grid, "interleaved", seed=7)
+    indices = [i for _, i in woven]
+    assert indices == sorted(indices), "every episode i must precede any episode i+1"
+    assert woven == episode_slots(grid, "interleaved", seed=7)
+    assert [c.cell_id for c, _ in woven] != [
+        c.cell_id for c, _ in episode_slots(grid, "interleaved", seed=8)
+    ]
+
+
+def test_unknown_order_is_rejected_rather_than_silently_blocked():
+    with pytest.raises(ValueError, match="unknown order"):
+        episode_slots(default_grid(1, 1), "shuffled", seed=0)
+
+
+def test_rows_and_sidecar_record_the_order_and_the_calls(tmp_path):
+    out = run_mock(tmp_path, episodes=2, calibration=1, name="ordered.jsonl")
+    rows = read_rows(out)
+    assert sorted(r["run_order"] for r in rows) == list(range(len(rows)))
+    assert {r["order_mode"] for r in rows} == {"interleaved"}
+    assert {r["order_seed"] for r in rows} == {0}
+    # Every episode carries its per-call summary; the full prompts live in the
+    # sidecar, keyed so the two files join on (cell_id, episode_index).
+    assert all(r["llm_calls"] for r in rows if r["counterparty"] == "llm")
+    sidecar = read_rows(str(tmp_path / "ordered.calls.jsonl"))
+    assert {(r["cell_id"], r["episode_index"]) for r in rows} == {
+        (c["cell_id"], c["episode_index"]) for c in sidecar
+    }
+    a_call = next(c for c in sidecar if c["calls"])["calls"][0]
+    assert a_call["system"] and a_call["user"] and a_call["schema_props"]
 
 
 class SixDollarLLM:

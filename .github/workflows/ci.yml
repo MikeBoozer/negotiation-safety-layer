@@ -22,3 +22,30 @@ jobs:
       - name: Run tests
         # Tests run fully offline via the MockLLM brain — no ANTHROPIC_API_KEY needed.
         run: pytest -q
+
+  reproducibility:
+    # Separate job, and deliberately not folded into `test`, so this is its own
+    # named status check: the repo tells readers that one command regenerates
+    # every number in the write-up from committed data, and that promise
+    # deserves a green tick of its own rather than being buried in a generic
+    # test run. Also offline — it only reads results/*.jsonl.
+    name: Write-up numbers regenerate from committed data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Reproduce the published contrasts
+        run: pytest -q tests/test_reproducibility.py
+      - name: Show the regenerated numbers in the log
+        # So a reviewer can read the actual output on any commit without
+        # cloning and re-running it themselves.
+        run: |
+          python harness/analyze_experiment.py \
+            --in results/experiment.jsonl results/experiment-blind.jsonl
