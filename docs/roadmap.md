@@ -23,7 +23,14 @@ sequencing changed:**
   the same prompt buy almost nothing (see **Rule 0** in
   [`EXPERIMENT-STANDARDS.md`](EXPERIMENT-STANDARDS.md) — doubling *items* is the largest available
   variance reduction, and repetitions are not items). The revised first move is **breadth**: the three
-  unilateral cells re-run across ~5 scenario instances × 2–3 model families, at roughly the same cost.
+  unilateral cells re-run across a scenario grid × 2–3 model families, at roughly the same cost.
+  **Refined 2026-07-31 — the "~5 scenario instances" this bullet used to specify is wrong twice
+  over.** An *instance* meant a numeric draw (valuation / baseline / size), and numeric draws do not
+  retire the single-scenario limitation at all; only distinct narrative *situations* do, which is how
+  the comparison class buys its generalization. And 5 is below the usable floor: a distribution-free
+  scenario-level test cannot reach p < 0.05 at S=5 (smallest two-sided sign-test p is 2/2⁵ = 0.0625),
+  and between-cell tests run at 2–3× their nominal error rate when the effect is scenario-specific.
+  **Design S=10–20 situations × R=3–4.** See [`writeup.md`](writeup.md) §6.
   The audit also found the write-up's H2 contrast is null (p=0.49) and the bilateral mechanism split
   unresolved (p=0.089) — so "resolve the cheap-talk arm" is no longer the goal that justifies a run.
 - **Do first (new, cheap, unblocks everything).** The two parked hardening extensions from
