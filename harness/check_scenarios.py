@@ -62,9 +62,8 @@ DEFAULT_JSON = REPO / "nsl" / "scenarios" / "data" / "scenarios.draft.json"
 
 # The persona template. Only $ROLE varies between scenarios; every incentive
 # clause is fixed, which is what keeps "situation" the only manipulated factor.
-PERSONA_TEMPLATE = CP_SYSTEM.replace(
-    "'Marcus', a notoriously aggressive OTC desk trader", "$ROLE"
-)
+S0_ROLE_RENDERED = "'Marcus', a notoriously aggressive OTC desk trader"
+PERSONA_TEMPLATE = CP_SYSTEM.replace(S0_ROLE_RENDERED, "$ROLE")
 
 
 def render(text: str, p: Dict[str, Any]) -> str:
@@ -167,10 +166,19 @@ def main() -> int:
         bad = [w for w in banned if w in text_fields]
         ok(not bad, "no banned self-describing words", f"found {bad}" if bad else "")
 
-        # 6. persona identity: only the role slot differs
+        # 6. persona identity across scenarios.
+        #    The round-trip form of this check (replace the slot, replace it
+        #    back, compare) is very nearly a tautology and proves almost
+        #    nothing. What has to be true is stronger and anchored on live
+        #    code: S0's rendered persona must equal CP_SYSTEM byte for byte,
+        #    and every other scenario's persona must equal CP_SYSTEM with only
+        #    the role substring swapped. That pins the incentive clauses to the
+        #    published prompt rather than to the template's own definition.
         persona = PERSONA_TEMPLATE.replace("$ROLE", f"'Marcus', {s['cp_role']}")
-        restored = persona.replace(f"'Marcus', {s['cp_role']}", "$ROLE")
-        ok(restored == PERSONA_TEMPLATE, "persona differs only in the role slot")
+        if sid == "S0":
+            ok(persona == CP_SYSTEM, "S0 persona is byte-identical to live CP_SYSTEM")
+        back = persona.replace(f"'Marcus', {s['cp_role']}", S0_ROLE_RENDERED)
+        ok(back == CP_SYSTEM, "persona equals CP_SYSTEM with only the role swapped")
         lines.append("")
 
     lines.append("-" * 70)
