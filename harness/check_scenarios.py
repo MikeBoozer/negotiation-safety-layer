@@ -65,6 +65,20 @@ DEFAULT_JSON = REPO / "nsl" / "scenarios" / "data" / "scenarios.draft.json"
 S0_ROLE_RENDERED = "'Marcus', a notoriously aggressive OTC desk trader"
 PERSONA_TEMPLATE = CP_SYSTEM.replace(S0_ROLE_RENDERED, "$ROLE")
 
+# The three analysis slices N2 is designed around. Each must be close to an even
+# split or it carries no information: a tag true of every scenario cannot
+# separate anything. The first draft of this set failed exactly here - `credible`
+# was 17/17 and `regulated` 1/17 - because the scenarios were written first and
+# described afterwards. Balance has to be commissioned, not observed, which is
+# why generation-prompt.md states the targets and why this check enforces them.
+DESIGNED_AXES = [
+    {"field": "concession_is_immoral", "values": [True, False]},
+    {"field": "threat_channel", "values": ["material", "reputational"]},
+    {"field": "threat_cost_unknown", "values": [True, False]},
+]
+# A slice below this share is too lopsided to support a comparison.
+BALANCE_MIN = 0.35
+
 
 def render(text: str, p: Dict[str, Any]) -> str:
     out = text
@@ -87,7 +101,26 @@ def main() -> int:
     ap.add_argument("--out", default=str(REPO / "results" / "scenario-check.txt"))
     args = ap.parse_args()
 
-    doc = json.loads(Path(args.json).read_text(encoding="utf-8"))
+    raw = json.loads(Path(args.json).read_text(encoding="utf-8"))
+
+    # The generation prompt asks the model for a BARE JSON ARRAY, because that
+    # is what a model reliably returns without inventing wrapper keys. So accept
+    # either shape: a bare array is wrapped here using the committed defaults,
+    # which means a freshly pasted batch can go straight through the gate with
+    # no hand-editing. Hand-editing a batch before validating it is exactly how
+    # you end up validating something other than what the model produced.
+    if isinstance(raw, list):
+        defaults = json.loads(DEFAULT_JSON.read_text(encoding="utf-8"))
+        doc = {
+            "generated": "(bare array - defaults applied)",
+            "fixed_params": defaults["fixed_params"],
+            "banned_in_scenario_text": defaults["banned_in_scenario_text"],
+            "design": {"tag_balance_axes": DESIGNED_AXES},
+            "scenarios": raw,
+        }
+    else:
+        doc = raw
+
     params = doc["fixed_params"]
     banned = [w.lower() for w in doc["banned_in_scenario_text"]]
     scenarios: List[Dict[str, Any]] = doc["scenarios"]
@@ -107,28 +140,35 @@ def main() -> int:
 
     # ---- check 1: S0 fidelity against the live code -------------------------
     lines.append("[1] S0 renders byte-identical to the published prompt")
-    s0 = next(s for s in scenarios if s["scenario_id"] == "S0")
-    live_preamble = _preamble(
-        float(params["valuation"]), float(params["baseline"]), float(params["size"]), None
-    )[0]
-    ok(render(s0["cp_situation"], params) == live_preamble, "counterparty situation string")
-    if render(s0["cp_situation"], params) != live_preamble:
-        lines.append(f"      draft: {render(s0['cp_situation'], params)!r}")
-        lines.append(f"      live : {live_preamble!r}")
+    s0 = next((s for s in scenarios if s["scenario_id"] == "S0"), None)
+    if s0 is None:
+        lines.append("  [skip] no S0 in this file. A freshly generated batch will not contain it.")
+        lines.append("         S0 must be added before the set is used, because it is the published")
+        lines.append("         scenario and re-running it gives a free replication check against")
+        lines.append("         the 240 recorded episodes.")
+        lines.append("")
+    else:
+        live_preamble = _preamble(
+            float(params["valuation"]), float(params["baseline"]), float(params["size"]), None
+        )[0]
+        ok(render(s0["cp_situation"], params) == live_preamble, "counterparty situation string")
+        if render(s0["cp_situation"], params) != live_preamble:
+            lines.append(f"      draft: {render(s0['cp_situation'], params)!r}")
+            lines.append(f"      live : {live_preamble!r}")
 
-    scen = OTCScenario()
-    live_ctx = scen.negotiation_context(float(params["baseline"]))
-    ok(render(s0["our_context"], params) == live_ctx, "our negotiation context string")
-    if render(s0["our_context"], params) != live_ctx:
-        lines.append(f"      draft: {render(s0['our_context'], params)!r}")
-        lines.append(f"      live : {live_ctx!r}")
+        scen = OTCScenario()
+        live_ctx = scen.negotiation_context(float(params["baseline"]))
+        ok(render(s0["our_context"], params) == live_ctx, "our negotiation context string")
+        if render(s0["our_context"], params) != live_ctx:
+            lines.append(f"      draft: {render(s0['our_context'], params)!r}")
+            lines.append(f"      live : {live_ctx!r}")
 
-    live_stakes = scen.describe_stakes()
-    ok(render(s0["stakes"], params) == live_stakes, "stakes string")
-    if render(s0["stakes"], params) != live_stakes:
-        lines.append(f"      draft: {render(s0['stakes'], params)!r}")
-        lines.append(f"      live : {live_stakes!r}")
-    lines.append("")
+        live_stakes = scen.describe_stakes()
+        ok(render(s0["stakes"], params) == live_stakes, "stakes string")
+        if render(s0["stakes"], params) != live_stakes:
+            lines.append(f"      draft: {render(s0['stakes'], params)!r}")
+            lines.append(f"      live : {live_stakes!r}")
+        lines.append("")
 
     # ---- checks 2-6, per scenario -------------------------------------------
     strategic_hits = 0
@@ -180,6 +220,31 @@ def main() -> int:
         back = persona.replace(f"'Marcus', {s['cp_role']}", S0_ROLE_RENDERED)
         ok(back == CP_SYSTEM, "persona equals CP_SYSTEM with only the role swapped")
         lines.append("")
+
+    # ---- check 7: designed tag balance --------------------------------------
+    lines.append("[7] designed slice balance")
+    axes = doc.get("design", {}).get("tag_balance_axes")
+    if not axes:
+        lines.append("  [skip] no design.tag_balance_axes in this file - it predates the balance")
+        lines.append("         requirement. Its tags were observed after writing rather than")
+        lines.append("         commissioned, so they cannot support the analysis slices.")
+    else:
+        n = len(scenarios)
+        for axis in axes:
+            field = axis["field"]
+            missing = [s["scenario_id"] for s in scenarios if field not in s]
+            if missing:
+                ok(False, f"every scenario declares {field}", f"missing on {missing[:6]}")
+                continue
+            for value in axis["values"]:
+                k = sum(1 for s in scenarios if s[field] == value)
+                share = k / n if n else 0.0
+                ok(
+                    share >= BALANCE_MIN,
+                    f"{field} == {value!r} is not lopsided",
+                    f"{k}/{n} = {100 * share:.0f}%  (need >= {100 * BALANCE_MIN:.0f}%)",
+                )
+    lines.append("")
 
     lines.append("-" * 70)
     lines.append(
