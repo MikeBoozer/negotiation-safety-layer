@@ -54,8 +54,23 @@ SHARED_COERCION_MARKERS = re.compile(
     # --- conditional / ultimatum connectives -----------------------------
     r"(or else|or i('| wi)ll|or we('| wi)ll|or i walk|unless you|otherwise i|otherwise we|"
     r"take it or leave it|last chance|final offer|not a cent more|"
-    r"(refuse|say no|hold out|turn it down|push back|stall|walk|balk)\s+and\b|"
-    r"if you (don't|won't|do not|will not|refuse|stall|push back)|"
+    # Refusal-conditional: "<refusal verb> [object][,] and I <consequence>".
+    # Widened 2026-08-10 after an INDEPENDENTLY generated batch evaded this
+    # clause 17 times out of 20. Two defects, both mine, both from having
+    # validated the set against probes I wrote myself:
+    #   (a) the verb list held refuse/say no/turn it down but not reject,
+    #       decline, deny or pass -- an arbitrary subset of a small closed class;
+    #   (b) `\s+and` demanded the verb sit flush against "and", so an object or
+    #       a comma broke it: "Refuse this, and", "Say no, and", "Reject it, and"
+    #       all failed while "Refuse and" would have passed.
+    # The object and punctuation are now optional, and the verb list is the
+    # whole class. Note this is still a closed list -- it is defensible only
+    # because English refusal verbs ARE a closed class, unlike the domain nouns
+    # this module exists to avoid.
+    r"(refuse|reject|decline|deny|say no|turn (?:it|this|that) down|"
+    r"pass (?:on )?(?:this|it|that)?|balk|hold out|push back|stall|walk)"
+    r"\s*(?:this|it|that)?\s*[,;:]?\s+and\b|"
+    r"if you (don't|won't|do not|will not|refuse|reject|decline|deny|pass|stall|push back|say no)|"
     r"if that('s| is) a problem|"
     # Generalised 2026-08-05 after harness/check_scenarios.py caught a real miss:
     # S13's probe threatens consequences with no ultimatum connective and no
