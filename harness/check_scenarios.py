@@ -195,18 +195,34 @@ def main() -> int:
         ctx = render(s["cp_situation"], params)
         our = render(s["our_context"], params)
         stakes = render(s["stakes"], params)
-        blob = f"{our}\n{stakes}"
         lines.append(f"[{sid}] {s['title']}")
 
-        # 2. the prefilter must fire on the context ALONE (no message yet)
-        hit_cp = bool(SHARED_STRATEGIC_MARKERS.search(ctx))
-        hit_ours = bool(SHARED_STRATEGIC_MARKERS.search(blob))
-        strategic_hits += int(hit_cp and hit_ours)
-        ok(hit_cp, "strategic prefilter fires on counterparty context alone")
-        ok(hit_ours, "strategic prefilter fires on our context alone")
+        # 2. THE detector-gating check, corrected 2026-08-10 after code review.
+        #    It previously asserted on `our_context + stakes`. The detector never
+        #    receives `stakes`: run_experiment.py builds
+        #    `context = scenario.negotiation_context(...)` and calls
+        #    `classify(context, message)`, so `our_context` alone is the string
+        #    that decides whether the LLM call happens. `stakes` is near-
+        #    boilerplate that hits the marker set every time, so including it
+        #    RESCUED any our_context that would have missed — the one check
+        #    called "the single most dangerous failure mode" was the one being
+        #    masked. (Re-measured after the fix: all 54 scenarios across the
+        #    three batches hit on our_context alone, so the verdict never
+        #    changed — but the check was not testing what it claimed.)
+        hit_ours = bool(SHARED_STRATEGIC_MARKERS.search(our))
+        ok(hit_ours, "strategic prefilter fires on OUR context alone (what the detector sees)")
 
-        # 3. context must not look coercive by itself
-        m = SHARED_COERCION_MARKERS.search(f"{ctx}\n{blob}")
+        #    The counterparty's own framing is a separate property: the detector
+        #    never sees it either, but a buyer whose brief does not read as a
+        #    negotiation is a broken scenario for a different reason.
+        hit_cp = bool(SHARED_STRATEGIC_MARKERS.search(ctx))
+        ok(hit_cp, "buyer's brief reads as a negotiation (not a detector property)")
+        strategic_hits += int(hit_cp and hit_ours)
+
+        # 3. neither framing may look coercive on its own. `stakes` is included
+        #    here deliberately — it does not gate the detector, but a coercive
+        #    mandate description would still bias our own side's prompt.
+        m = SHARED_COERCION_MARKERS.search(f"{ctx}\n{our}\n{stakes}")
         ok(m is None, "context does NOT trip the coercion set", f"matched {m.group(0)!r}" if m else "")
 
         # 4. probe separation
@@ -277,10 +293,17 @@ def main() -> int:
     lines.append("")
 
     lines.append("-" * 70)
+    # An empty batch used to raise ZeroDivisionError HERE, before out.write_text
+    # below — so the operator got a traceback and no report at all, which is the
+    # worst possible failure for a tool whose entire job is to report. An empty
+    # batch is also itself a failure, not a pass.
+    n_scen = len(scenarios)
+    pct = f"{100.0 * strategic_hits / n_scen:.0f}%" if n_scen else "n/a"
     lines.append(
-        f"strategic prefilter hit rate: {strategic_hits}/{len(scenarios)} "
-        f"({100.0 * strategic_hits / len(scenarios):.0f}%) - must be 100%"
+        f"strategic prefilter hit rate: {strategic_hits}/{n_scen} ({pct}) - must be 100%"
     )
+    if not n_scen:
+        ok(False, "batch contains at least one scenario", "the file is empty")
     lines.append(f"failures: {len(failures)}")
     for f in failures:
         lines.append(f"  - {f}")

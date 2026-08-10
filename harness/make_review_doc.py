@@ -19,7 +19,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
@@ -48,6 +50,17 @@ def jaccard(a: Set[str], b: Set[str]) -> float:
     return len(a & b) / len(a | b) if a | b else 0.0
 
 
+def _repo_relative(path: str) -> str:
+    """Never echo an absolute path into a document committed to a PUBLIC repo.
+    The umbrella CLAUDE.md records a real incident where a private path reached
+    a public commit; this file writes its own re-run instructions, so it is one
+    `--out C:/Users/...` away from repeating it."""
+    try:
+        return Path(path).resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return Path(path).name
+
+
 def unit_of(cp_situation: str) -> str:
     """The good as the BUYER sees it named. This is not cosmetic: the counterparty
     model is shown `cp_situation` and nothing else — not the title, not the domain
@@ -55,7 +68,11 @@ def unit_of(cp_situation: str) -> str:
     residential zone" whose situation says only "you are buying $SIZE hours"
     presents to the model as a generic purchase of hours, indistinguishable from
     any other scenario selling hours."""
-    m = re.search(r"buying \$SIZE ([^.]+)\.", cp_situation)
+    # The verb alternation exists because the committed draft's S11 reads
+    # "you are LEASING $SIZE acres...". With `buying` hardcoded it returned "?",
+    # which is one word, so the scenario was silently counted as having a bare
+    # single-word good and got a spurious "the buyer sees only ..." flag.
+    m = re.search(r"(?:buying|leasing|purchasing|acquiring|renting) \$SIZE ([^.]+)\.", cp_situation)
     return m.group(1).strip() if m else "?"
 
 
@@ -79,6 +96,28 @@ def main() -> int:
     raw = json.loads(Path(args.json).read_text(encoding="utf-8"))
     scenarios: List[Dict[str, Any]] = raw if isinstance(raw, list) else raw["scenarios"]
     n = len(scenarios)
+    if n == 0:
+        print("empty batch - nothing to review", file=sys.stderr)
+        return 2
+
+    # Actually run the gate rather than asserting its result. The previous
+    # version stated "check_scenarios.py passes on this batch" unconditionally,
+    # so a document generated from a FAILING batch told the reader not to check
+    # exactly the properties that had failed.
+    # Written to a temp dir, not next to --out: the docs live in a public repo
+    # and a generated side-file beside them is noise a reader would have to
+    # explain. The path is echoed into the document so it can still be read.
+    gate_dir = tempfile.mkdtemp(prefix="nsl-gate-")
+    gate_report = str(Path(gate_dir) / "check_scenarios.txt")
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(REPO / "harness" / "check_scenarios.py"),
+             "--json", args.json, "--out", gate_report],
+            capture_output=True, text=True, timeout=120,
+        )
+        gate_passed: Any = proc.returncode == 0
+    except Exception:  # noqa: BLE001 - a missing/broken gate must not block review
+        gate_passed = None
 
     # Similarity is computed on the BUYER-VISIBLE text only. Comparing titles
     # would flatter the batch: titles can be vividly different while the text the
@@ -126,8 +165,18 @@ def main() -> int:
     w("")
     w("## Already checked — do not spend time re-checking")
     w("")
-    w("`harness/check_scenarios.py` passes on this batch, which means all of the following are")
-    w("already true and need none of your attention:")
+    if gate_passed is True:
+        w("**Verified when this document was generated:** `harness/check_scenarios.py` exits 0 on")
+        w("this batch. So all of the following are already true and need none of your attention:")
+    elif gate_passed is False:
+        w("> 🚨 **`harness/check_scenarios.py` FAILS on this batch.** The list below is what the gate")
+        w("> is *supposed* to guarantee, and at least one item is not true right now. **Do not skip")
+        w("> these while the gate is red** — fix the batch and regenerate this document first.")
+        w(">")
+        w(f"> Gate report: `{gate_report}`")
+    else:
+        w("**Unverified:** the gate could not be run when this document was generated, so treat the")
+        w("list below as unconfirmed and run it yourself before relying on it.")
     w("")
     w("- every scenario's setup contains the vocabulary that makes the threat-detector actually run")
     w("  (if it didn't, quiet episodes would be silently mislabelled — the worst failure available)")
@@ -169,8 +218,10 @@ def main() -> int:
     w("Edit the JSON directly, then re-run both:")
     w("")
     w("```")
-    w(f"python harness/check_scenarios.py --json {args.json}")
-    w(f"python harness/make_review_doc.py --json {args.json} --out {args.out}")
+    rel_json = _repo_relative(args.json)
+    rel_out = _repo_relative(args.out)
+    w(f"python harness/check_scenarios.py --json {rel_json}")
+    w(f"python harness/make_review_doc.py --json {rel_json} --out {rel_out}")
     w("```")
     w("")
     w("The gate must still exit 0 afterwards. If you rewrite a probe, that is exactly when it is")
@@ -181,20 +232,34 @@ def main() -> int:
     w("## Flags worth knowing before you start")
     w("")
 
-    cells: Dict[Tuple[Any, Any], List[str]] = {}
-    for s in scenarios:
-        cells.setdefault((s["concession_is_immoral"], s["threat_channel"]), []).append(s["scenario_id"])
-    w("**Design grid** — how the two main axes cross. Badly lopsided cells weaken later slices:")
-    w("")
-    w("| | material leverage | reputational leverage |")
-    w("|---|---|---|")
-    for immoral in (True, False):
-        row = []
-        for ch in ("material", "reputational"):
-            ids = cells.get((immoral, ch), [])
-            row.append(f"{len(ids)} — {', '.join(ids)}" if ids else "**0 — empty**")
-        w(f"| **concession harms others: {immoral}** | {row[0]} | {row[1]} |")
-    w("")
+    # A batch predating the designed axes (e.g. scenarios.draft.json, which uses
+    # the older `tags` array) declares none of these fields. Indexing them raised
+    # KeyError and killed the tool on the only scenario file the branch commits.
+    has_axes = all(
+        f in s for s in scenarios for f in ("concession_is_immoral", "threat_channel")
+    )
+    if not has_axes:
+        w("**Design grid** — not available: this batch predates the designed axes and declares no")
+        w("`concession_is_immoral` / `threat_channel` fields, so it cannot support the analysis")
+        w("slices. Treat every scenario here as unclassified.")
+        w("")
+    else:
+        cells: Dict[Tuple[Any, Any], List[str]] = {}
+        for s in scenarios:
+            cells.setdefault(
+                (s["concession_is_immoral"], s["threat_channel"]), []
+            ).append(s["scenario_id"])
+        w("**Design grid** — how the two main axes cross. Badly lopsided cells weaken later slices:")
+        w("")
+        w("| | material leverage | reputational leverage |")
+        w("|---|---|---|")
+        for immoral in (True, False):
+            row = []
+            for ch in ("material", "reputational"):
+                ids = cells.get((immoral, ch), [])
+                row.append(f"{len(ids)} — {', '.join(ids)}" if ids else "**0 — empty**")
+            w(f"| **concession harms others: {immoral}** | {row[0]} | {row[1]} |")
+        w("")
 
     w(f"**Most similar pairs** (shared distinctive words, template stripped; flagged at "
       f"{SIMILARITY_FLAG:.2f}). High means *look*, not *delete* — two mining scenarios can still")
@@ -208,8 +273,14 @@ def main() -> int:
     else:
         w(f"None above {SIMILARITY_FLAG:.2f} — no two scenarios share an unusual amount of wording.")
     w("")
-    w(f"Top overlap overall is **{pairs[0][0]:.2f}** ({pairs[0][1]} ~ {pairs[0][2]}); "
-      f"median across all {len(pairs)} pairs is **{sorted(p[0] for p in pairs)[len(pairs)//2]:.2f}**.")
+    # A single-scenario batch yields no pairs at all; indexing pairs[0] used to
+    # raise IndexError, which a reviewer hits precisely when trimming a set down.
+    if pairs:
+        w(f"Top overlap overall is **{pairs[0][0]:.2f}** ({pairs[0][1]} ~ {pairs[0][2]}); "
+          f"median across all {len(pairs)} pairs is "
+          f"**{sorted(p[0] for p in pairs)[len(pairs)//2]:.2f}**.")
+    else:
+        w("Only one scenario in this batch, so there are no pairs to compare.")
     w("")
 
     w("### 🚩 What the buyer actually sees — read this before anything else")
@@ -255,10 +326,10 @@ def main() -> int:
     counts: Dict[str, int] = {}
     for sid, hit in marker_hits.items():
         counts[hit.lower()] = counts.get(hit.lower(), 0) + 1
-    top = sorted(counts.items(), key=lambda kv: -kv[1])[0]
+    top = sorted(counts.items(), key=lambda kv: -kv[1])[0] if counts else ("(none)", 0)
     w(f"**Threat phrasing variety.** The most common single trigger phrase is `{top[0]}`, in "
       f"{top[1]} of {n} coercive examples.")
-    if top[1] > n // 2:
+    if counts and top[1] > n // 2:
         w("")
         w("> ⚠️ More than half the coercive examples are phrased the same way. That is a")
         w("> monoculture: it makes the detector look more reliable than it is, because it is only")
@@ -275,9 +346,13 @@ def main() -> int:
         w("")
         w(f"- **Trading:** {unit_of(s['cp_situation'])}")
         w(f"- **Buyer role:** {s['cp_role']}")
-        w(f"- **Concession harms a third party:** `{s['concession_is_immoral']}` · "
-          f"**Leverage:** `{s['threat_channel']}` · "
-          f"**Buyer's cost of following through is hidden:** `{s['threat_cost_unknown']}`")
+        if has_axes:
+            w(f"- **Concession harms a third party:** `{s['concession_is_immoral']}` · "
+              f"**Leverage:** `{s['threat_channel']}` · "
+              f"**Buyer's cost of following through is hidden:** "
+              f"`{s.get('threat_cost_unknown', 'unset')}`")
+        else:
+            w(f"- **Tags (older scheme):** {', '.join(s.get('tags', [])) or 'none'}")
         extra = extra_clause(s["cp_situation"])
         if extra:
             w(f"- **Added context:** {extra}")
@@ -298,11 +373,11 @@ def main() -> int:
         if not extra:
             notes.append("no added context, so the buyer's cost of following through is inferred "
                          "only from the domain — confirm that matches the "
-                         f"`threat_cost_unknown = {s['threat_cost_unknown']}` label")
+                         f"`threat_cost_unknown = {s.get('threat_cost_unknown', 'unset')}` label")
         if re.search(r"\bwho\b|\bthat\b", s["cp_role"]):
             notes.append("🚩 role contains a relative clause — check it names a JOB and not a "
                          "disposition; this is the case the automated check cannot catch")
-        if s["concession_is_immoral"] and not extra:
+        if s.get("concession_is_immoral") and not extra:
             notes.append("labelled as harming a third party, but the setup names no third party — "
                          "either add a clause or flip the label")
         w(f"- Trigger phrase matched: `{marker_hits[sid]}`")
