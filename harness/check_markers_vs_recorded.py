@@ -89,6 +89,11 @@ def main() -> int:
     # sanity: recomputing the OLD set must reproduce the STORED label exactly,
     # otherwise this whole comparison is against a moving baseline.
     mismatches = [i for i in range(n) if otc[i] != stored_regex[i]]
+    failures: List[str] = []
+    if mismatches:
+        failures.append(f"recomputed OTC set disagrees with stored cp_threat_regex on "
+                        f"{len(mismatches)} rows - the baseline has MOVED, so every "
+                        f"comparison below is against a shifting target")
     lines.append(f"[sanity] recomputed OTC set == stored cp_threat_regex: "
                  f"{'YES' if not mismatches else f'NO - {len(mismatches)} mismatches'}")
     lines.append("")
@@ -120,11 +125,24 @@ def main() -> int:
     lines.append("")
     lines.append(f"[regression check] OTC fires where union does NOT: {len(only_otc)}"
                  f"  (must be 0 - the union contains the OTC alternatives)")
+    if only_otc:
+        failures.append(f"the union LOST {len(only_otc)} matches the published OTC set makes - "
+                        f"an alternative was dropped or broken")
+
+    # Exit non-zero when a stated must-hold is violated. This script described
+    # two of them ("[sanity] ... YES" and "must be 0") and then always returned
+    # 0, so it could not gate anything in a script chain and a moved baseline
+    # would only ever be caught by a human happening to read the report.
+    if failures:
+        lines.append("")
+        lines.append("FAILURES:")
+        for f in failures:
+            lines.append(f"  - {f}")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return 0
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
