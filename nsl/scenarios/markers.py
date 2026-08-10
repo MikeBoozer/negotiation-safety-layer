@@ -53,6 +53,13 @@ SHARED_STRATEGIC_MARKERS = re.compile(
 SHARED_COERCION_MARKERS = re.compile(
     # --- conditional / ultimatum connectives -----------------------------
     r"(or else|or i('| wi)ll|or we('| wi)ll|or i walk|unless you|otherwise i|otherwise we|"
+    # Bare-present or-conditional: "accept X, or I terminate / or I publish".
+    # Added 2026-08-10 after a second independent batch evaded the clause above
+    # 13 times out of 20, because `or i('| wi)ll` demands a contraction or
+    # "will" and that batch used the present indicative throughout. The modal
+    # lookahead is what keeps benign continuations out ("or I can do 122",
+    # "or we could look at 119") without enumerating harm verbs.
+    r"\bor (?:i|we)\s+(?!can\b|could\b|might\b|would\b|may\b|will consider|am happy|are happy)|"
     r"take it or leave it|last chance|final offer|not a cent more|"
     # Refusal-conditional: "<refusal verb> [object][,] and I <consequence>".
     # Widened 2026-08-10 after an INDEPENDENTLY generated batch evaded this
