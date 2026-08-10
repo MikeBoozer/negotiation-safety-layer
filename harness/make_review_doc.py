@@ -54,11 +54,19 @@ def _repo_relative(path: str) -> str:
     """Never echo an absolute path into a document committed to a PUBLIC repo.
     The umbrella CLAUDE.md records a real incident where a private path reached
     a public commit; this file writes its own re-run instructions, so it is one
-    `--out C:/Users/...` away from repeating it."""
+    `--out C:/Users/...` away from repeating it.
+
+    The fallback returns a CANONICAL in-repo path rather than a bare filename.
+    A bare name produced instructions like `--out review.md`, which write to
+    whatever the reader's cwd happens to be instead of to the file they are
+    holding — quietly wrong in a way nobody notices until the document stops
+    updating."""
+    resolved = Path(path).resolve()
     try:
-        return Path(path).resolve().relative_to(REPO).as_posix()
+        return resolved.relative_to(REPO).as_posix()
     except ValueError:
-        return Path(path).name
+        sub = "nsl/scenarios/data" if resolved.suffix == ".json" else "docs"
+        return f"{sub}/{resolved.name}"
 
 
 def unit_of(cp_situation: str) -> str:
@@ -104,19 +112,38 @@ def main() -> int:
     # version stated "check_scenarios.py passes on this batch" unconditionally,
     # so a document generated from a FAILING batch told the reader not to check
     # exactly the properties that had failed.
-    # Written to a temp dir, not next to --out: the docs live in a public repo
-    # and a generated side-file beside them is noise a reader would have to
-    # explain. The path is echoed into the document so it can still be read.
-    gate_dir = tempfile.mkdtemp(prefix="nsl-gate-")
-    gate_report = str(Path(gate_dir) / "check_scenarios.txt")
+    # Run the gate in a temp dir that is CLEANED UP, and carry back the failure
+    # LINES rather than a path. Three defects came from the first attempt:
+    #   * the path was echoed into the document, so a mkdtemp path containing the
+    #     OS username reached a file bound for a public repo — the exact thing
+    #     `_repo_relative` two functions up exists to prevent;
+    #   * mkdtemp was never removed, littering a directory per run and per CI
+    #     invocation of tests/test_harness_tools.py;
+    #   * any non-zero exit, including a traceback, was reported as "the batch
+    #     FAILS", while a crashing gate writes no report at all — so the document
+    #     told the reader to fix a batch and pointed at a file that never existed.
+    # A crash is now None (unverified), which says something different.
+    gate_passed: Any = None
+    gate_lines: List[str] = []
     try:
-        proc = subprocess.run(
-            [sys.executable, str(REPO / "harness" / "check_scenarios.py"),
-             "--json", args.json, "--out", gate_report],
-            capture_output=True, text=True, timeout=120,
-        )
-        gate_passed: Any = proc.returncode == 0
-    except Exception:  # noqa: BLE001 - a missing/broken gate must not block review
+        with tempfile.TemporaryDirectory(prefix="nsl-gate-") as gate_dir:
+            report_path = Path(gate_dir) / "check_scenarios.txt"
+            proc = subprocess.run(
+                [sys.executable, str(REPO / "harness" / "check_scenarios.py"),
+                 "--json", args.json, "--out", str(report_path)],
+                capture_output=True, text=True, timeout=120,
+            )
+            if report_path.exists():
+                gate_passed = proc.returncode == 0
+                if not gate_passed:
+                    gate_lines = [
+                        ln.strip()
+                        for ln in report_path.read_text(encoding="utf-8").splitlines()
+                        if ln.strip().startswith("- ") or "[FAIL]" in ln
+                    ][:12]
+            else:
+                gate_lines = proc.stderr.strip().splitlines()[-3:]
+    except Exception:  # noqa: BLE001 - a broken gate must not block review
         gate_passed = None
 
     # Similarity is computed on the BUYER-VISIBLE text only. Comparing titles
@@ -135,7 +162,20 @@ def main() -> int:
     marker_hits: Dict[str, str] = {}
     for s in scenarios:
         m = SHARED_COERCION_MARKERS.search(s["probes"]["coercive"])
-        marker_hits[s["scenario_id"]] = m.group(0) if m else "(none)"
+        # The refusal clause anchors on a sentence boundary, so the raw match
+        # carries that punctuation — ". Refuse this, and". Left raw, the SAME
+        # phrasing after "." and after ";" tallies as two distinct phrases,
+        # silently disabling the monoculture warning below, whose entire job is
+        # noticing that one phrasing dominates.
+        marker_hits[s["scenario_id"]] = (
+            m.group(0).lstrip(".!?;:,-–— \t\n") if m else "(none)"
+        )
+
+    # Defined here, not at first use further down: the gate-failure banner needs
+    # `rel_json`, and it renders well above the "what to do with your edits"
+    # section that used to own these.
+    rel_json = _repo_relative(args.json)
+    rel_out = _repo_relative(args.out)
 
     L: List[str] = []
     w = L.append
@@ -173,10 +213,20 @@ def main() -> int:
         w("> is *supposed* to guarantee, and at least one item is not true right now. **Do not skip")
         w("> these while the gate is red** — fix the batch and regenerate this document first.")
         w(">")
-        w(f"> Gate report: `{gate_report}`")
+        w("> What it reported:")
+        w(">")
+        for ln in gate_lines:
+            w(f">     {ln}")
+        w(">")
+        w(f"> Re-run it yourself: `python harness/check_scenarios.py --json {rel_json}`")
     else:
-        w("**Unverified:** the gate could not be run when this document was generated, so treat the")
-        w("list below as unconfirmed and run it yourself before relying on it.")
+        w("> ⚠️ **Unverified.** `harness/check_scenarios.py` could not be run, or crashed without")
+        w("> producing a report — which is NOT the same as the batch failing. Treat the list below")
+        w("> as unconfirmed and run the gate yourself before relying on any of it.")
+        if gate_lines:
+            w(">")
+            for ln in gate_lines:
+                w(f">     {ln}")
     w("")
     w("- every scenario's setup contains the vocabulary that makes the threat-detector actually run")
     w("  (if it didn't, quiet episodes would be silently mislabelled — the worst failure available)")
@@ -218,8 +268,6 @@ def main() -> int:
     w("Edit the JSON directly, then re-run both:")
     w("")
     w("```")
-    rel_json = _repo_relative(args.json)
-    rel_out = _repo_relative(args.out)
     w(f"python harness/check_scenarios.py --json {rel_json}")
     w(f"python harness/make_review_doc.py --json {rel_json} --out {rel_out}")
     w("```")

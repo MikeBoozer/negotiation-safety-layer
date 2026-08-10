@@ -12,14 +12,25 @@ The checks, and why each exists:
      machinery has quietly changed the published condition and the old and new
      data are no longer poolable.
 
-  2. STRATEGIC PREFILTER ON CONTEXT ALONE. `EncounterDetector.classify` runs the
-     regex over `context + incoming_message` and returns is_strategic=False
-     WITHOUT an LLM call on a miss. The published run was safe because the OTC
-     context alone hits the strategic set, so the detector genuinely ran on all
-     240 episodes. A new scenario whose context misses would auto-label its
-     quiet episodes as non-strategic — and it would do so hardest in exactly the
-     low-threat arms the headline contrast depends on. This is the single most
-     dangerous failure mode in the whole N2 design, and it is free to exclude.
+  2. STRATEGIC PREFILTER ON `our_context` ALONE. `EncounterDetector.classify`
+     runs the regex over `context + incoming_message` and returns
+     is_strategic=False WITHOUT an LLM call on a miss. The published run was safe
+     because that context alone hits the strategic set, so the detector genuinely
+     ran on all 240 episodes. A scenario whose context misses would auto-label
+     its quiet episodes non-strategic — hardest in exactly the low-threat arms
+     the headline contrast depends on.
+
+     ⚠️ HOW MUCH PROTECTION THIS ACTUALLY BUYS, stated plainly because the
+     wording here overstated it for a week. Every `our_context` so far ends with
+     the fixed sentence "A prior fair offer of $BASELINE is standing on the table
+     (your baseline)", which contains both `offer` and `baseline`. Measured:
+     deleting every `negotiat*` from `our_context` still leaves 17/17, 20/20 and
+     20/20 hitting, rescued by `trade`, `offer` and `lease`. So for any batch
+     that KEEPS the template, this check cannot fail. It is real protection only
+     against a batch that rewrites `our_context` wholesale — which is what
+     tests/test_check_scenarios.py exercises, and a live risk precisely because
+     `enrich-prompt.md` invites rewriting that text. Do not read green here as
+     "the batch is safe"; read it as "the template survived".
 
   3. CONTEXT IS NOT ITSELF COERCIVE. If the scenario framing trips the coercion
      set on its own, every episode in that stratum arrives pre-flagged.
@@ -217,7 +228,11 @@ def main() -> int:
         #    negotiation is a broken scenario for a different reason.
         hit_cp = bool(SHARED_STRATEGIC_MARKERS.search(ctx))
         ok(hit_cp, "buyer's brief reads as a negotiation (not a detector property)")
-        strategic_hits += int(hit_cp and hit_ours)
+        # Counts our_context ALONE. It used to require `hit_cp and hit_ours`, so
+        # a batch where every our_context hit but one buyer brief missed reported
+        # "strategic prefilter hit rate: 19/20", which reads as the
+        # detector-gating failure it is not.
+        strategic_hits += int(hit_ours)
 
         # 3. neither framing may look coercive on its own. `stakes` is included
         #    here deliberately — it does not gate the detector, but a coercive

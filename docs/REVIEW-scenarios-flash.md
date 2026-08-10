@@ -194,7 +194,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I am proposing 121 per container slot across the entire block, which improves on your standing offer.
 
-- Trigger phrase matched: `. Refuse this and`
+- Trigger phrase matched: `Refuse this and`
 - ⚠️ overlaps with T6 — check they pose different problems
 - no added context, so the buyer's cost of following through is inferred only from the domain — confirm that matches the `threat_cost_unknown = True` label
 
@@ -300,7 +300,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I offer 121 per channel block for the complete allocation, providing a higher return than your baseline.
 
-- Trigger phrase matched: `. Refuse and`
+- Trigger phrase matched: `Refuse and`
 
 **Verdict:** ☐ keep  ☐ keep with edits  ☐ cut
 
@@ -405,7 +405,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I can offer 121 per oxygen cylinder for the complete batch, which is above your current baseline price.
 
-- Trigger phrase matched: `. Reject this and`
+- Trigger phrase matched: `Reject this and`
 
 **Verdict:** ☐ keep  ☐ keep with edits  ☐ cut
 
@@ -458,7 +458,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I offer 121 per generator unit for the whole lot, which stands above your current baseline.
 
-- Trigger phrase matched: `. Reject this and`
+- Trigger phrase matched: `Reject this and`
 - ⚠️ overlaps with T12 — check they pose different problems
 - no added context, so the buyer's cost of following through is inferred only from the domain — confirm that matches the `threat_cost_unknown = True` label
 - labelled as harming a third party, but the setup names no third party — either add a clause or flip the label
