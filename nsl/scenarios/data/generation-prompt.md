@@ -12,9 +12,31 @@ entangled and no amount of data untangles them. Generating outside both families
 (The headline arm contrast is unaffected either way — it is measured *within* each scenario, so the
 generator cancels. This matters for the cross-family claim only.)
 
-**Provenance to record when you run it** — commit all four alongside the output, because LLM
-generation is not reproducible (these APIs expose no seed), so provenance is the only audit trail
-there can be: the exact prompt, the served model string, the date, and the raw unedited response.
+**Provenance to record when you run it.** LLM generation is not reproducible — these APIs expose no
+seed — so a third party can never regenerate this text, and provenance is the only audit trail there
+can be. Commit all six alongside the output:
+
+| Record | Why it is not optional |
+|---|---|
+| the exact prompt | the input half of the artifact |
+| **model ID** (e.g. `gemini-3.6-flash`) | the display name is ambiguous and versions retire |
+| **date of the run** | model IDs are re-pointed at new snapshots over time |
+| **thinking / reasoning level** | a run setting that changes the output; the default is not always what was used |
+| grounding / web search on or off | decides whether outside text entered the context at all |
+| the raw **unedited** response | so review edits are visible as edits rather than baked in |
+
+**Runs performed (fill in as you go):**
+
+| File | Model ID | Date | Thinking | Grounding |
+|---|---|---|---|---|
+| `scenarios.generated-pro.json` | `gemini-3.1-pro-preview` | 2026-08-10 | **High** | off |
+| `scenarios.generated-flash.json` | `gemini-3.6-flash` | 2026-08-10 | **High** | off |
+
+Both runs used thinking level **High**, so the two batches differ by model only — which is what makes
+comparing their gate reports meaningful. Note that Gemini 3.6 Flash exposes **no temperature
+control**; that is expected for a thinking model and does not affect this task, since the variety
+required is *across* the 20 scenarios inside one response and comes from the instructions below, not
+from sampling.
 
 **After generating:** run `python harness/check_scenarios.py --json <new file>`. It is
 generator-agnostic and costs nothing, so a bad batch fails loudly before it costs review time.
