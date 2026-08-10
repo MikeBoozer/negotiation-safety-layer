@@ -13,6 +13,7 @@ material awaiting human review.
 |---|---|
 | `generation-prompt.md` | The prompt used to produce the candidate batches. Paste-ready. |
 | `critic-prompt.md` | Prompt for having a *different* model attack a batch before a human reviews it. |
+| `enrich-prompt.md` | Per-scenario prompt for rewriting a thin `cp_situation` so the buyer can actually tell situations apart. |
 | `scenarios.generated-flash.json` | **Candidate set — preferred.** 20 situations, Gemini 3.6 Flash. |
 | `scenarios.generated-pro.json` | **Candidate set — not selected.** 20 situations, Gemini 3.1 Pro Preview. |
 | `scenarios.draft.json` | **Superseded.** The first, hand-written 17. Retained as the source of S0. |
