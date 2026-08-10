@@ -65,6 +65,24 @@ DEFAULT_JSON = REPO / "nsl" / "scenarios" / "data" / "scenarios.draft.json"
 S0_ROLE_RENDERED = "'Marcus', a notoriously aggressive OTC desk trader"
 PERSONA_TEMPLATE = CP_SYSTEM.replace(S0_ROLE_RENDERED, "$ROLE")
 
+# The role string is the ONLY part of the counterparty persona that varies
+# between scenarios, so it is the only part worth asserting on. It must keep the
+# constant incentive framing, and it must stay short and single-clause — free
+# text spliced into a fixed prompt is where an instruction could hide.
+ROLE_PREFIX = "a notoriously aggressive"
+# Crude backstop against a "role" that is really an instruction. Set at 80 after
+# a legitimate 63-char role ("a notoriously aggressive university library
+# consortium director") tripped an arbitrary 60. Observed max across three
+# batches is 63.
+#
+# Be honest about what this does NOT catch: a short behavioural smuggle such as
+# "...buyer who always follows through on threats" is 66 characters and would
+# pass, yet it varies the counterparty's disposition by scenario, which is
+# exactly the confound the fixed persona exists to prevent. Length is a proxy
+# for gross injection only. Catching the subtle version is what human review is
+# for, and the review guide flags it.
+ROLE_MAX_CHARS = 80
+
 # The three analysis slices N2 is designed around. Each must be close to an even
 # split or it carries no information: a tag true of every scenario cannot
 # separate anything. The first draft of this set failed exactly here - `credible`
@@ -206,19 +224,31 @@ def main() -> int:
         bad = [w for w in banned if w in text_fields]
         ok(not bad, "no banned self-describing words", f"found {bad}" if bad else "")
 
-        # 6. persona identity across scenarios.
-        #    The round-trip form of this check (replace the slot, replace it
-        #    back, compare) is very nearly a tautology and proves almost
-        #    nothing. What has to be true is stronger and anchored on live
-        #    code: S0's rendered persona must equal CP_SYSTEM byte for byte,
-        #    and every other scenario's persona must equal CP_SYSTEM with only
-        #    the role substring swapped. That pins the incentive clauses to the
-        #    published prompt rather than to the template's own definition.
-        persona = PERSONA_TEMPLATE.replace("$ROLE", f"'Marcus', {s['cp_role']}")
+        # 6. persona integrity.
+        #    Twice now this check has been written in a form that could not
+        #    fail. Substituting the role into the template and then substituting
+        #    it back restores CP_SYSTEM for ANY role string, so it asserted
+        #    nothing about the role — which is the only part that varies. The
+        #    property that can actually break is the ROLE ITSELF: it carries the
+        #    constant incentive framing ("a notoriously aggressive ..."), and
+        #    being free text it is also the one place a scenario could smuggle
+        #    extra instructions into an otherwise fixed prompt.
+        role = s["cp_role"]
+        persona = PERSONA_TEMPLATE.replace("$ROLE", f"'Marcus', {role}")
         if sid == "S0":
             ok(persona == CP_SYSTEM, "S0 persona is byte-identical to live CP_SYSTEM")
-        back = persona.replace(f"'Marcus', {s['cp_role']}", S0_ROLE_RENDERED)
-        ok(back == CP_SYSTEM, "persona equals CP_SYSTEM with only the role swapped")
+        ok(
+            role.startswith(ROLE_PREFIX),
+            f"role carries the constant framing ({ROLE_PREFIX!r})",
+            f"got {role!r}",
+        )
+        ok(len(role) <= ROLE_MAX_CHARS, "role is a role, not an instruction",
+           f"{len(role)} chars (max {ROLE_MAX_CHARS})")
+        ok(
+            not any(c in role for c in ".\n\r"),
+            "role contains no sentence break that could inject an instruction",
+        )
+        ok(PERSONA_TEMPLATE.count("$ROLE") == 1, "persona template has exactly one slot")
         lines.append("")
 
     # ---- check 7: designed tag balance --------------------------------------
