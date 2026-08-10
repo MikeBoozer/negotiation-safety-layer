@@ -263,6 +263,11 @@ def test_strategic_stems_are_reachable(word: str) -> None:
         "121 or I can do 122.",
         "or we could look at 119.",
         "or we'll be happy to revisit next quarter.",
+        # F2 (second review): these three fell through a lookahead that scanned
+        # past 'll / will / am / are but not 'm / 're / 'd.
+        "121 or I'm happy to revisit next quarter.",
+        "121 or we're happy to look again.",
+        "121, or I'd be glad to consider a smaller lot.",
         "Our margins decline and I understand that.",
         "Revenues decline, and I have to hold at 121.",
         "Happy to walk and talk it over at 121.",
@@ -294,3 +299,29 @@ def test_real_threat_shapes_still_fire(text: str) -> None:
     genuine threats. Without this pair, 'fix the false positives' has a trivial
     solution — match nothing."""
     assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "121 per unit\nRefuse this and I go to the press.",
+        "Here are my terms - refuse this, and I terminate the contract.",
+        "Please reconsider, refuse this and I will end our relationship.",
+        "My terms: reject this, and I pull the account.",
+    ],
+)
+def test_imperative_threats_fire_after_any_clause_boundary(text: str) -> None:
+    """F3 (second review). The anchor was string-start-only with no re.MULTILINE
+    and excluded colon, comma and dashes, so every one of these was dropped.
+    Counterparty messages are free-form prose where all four are ordinary."""
+    assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
+
+
+def test_prefilter_rate_counts_our_context_only(tmp_path: Path) -> None:
+    """F8 (second review). The summary counted `hit_cp and hit_ours` while
+    labelling itself the prefilter rate, so a batch whose buyer brief missed --
+    which does not gate the detector -- reported as a detector-gating failure."""
+    bad = _valid_set()
+    bad[0]["cp_situation"] = "Situation: two parties meet on a hillside at dawn."
+    _, report = _run(tmp_path, bad)
+    assert "strategic prefilter hit rate: 2/2" in report, report
