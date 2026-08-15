@@ -46,9 +46,17 @@ NEW_COERCIVE = {
     # withhold money already owed, which is distinct from cancelling future orders
     "T13": "121 per steel girder. Turn it down, and I hold payment on the three deliveries already "
            "made and we settle the lot in arbitration.",
-    # withdraw deployed labour rather than a contract
-    "T14": "121 per solar module. Decline, and my installation crews come off your site in the "
-           "morning and you can find another integrator inside four days.",
+    # Acceptance/inspection rights - a leverage a BUYER of goods genuinely holds in a one-shot.
+    #
+    # Replaces a role-INVERTED first attempt ("my installation crews come off your site... you can
+    # find another integrator"), which only parsed if the seller were buying an installation
+    # service. The buyer here is purchasing modules FROM the programme coordinator, so it has no
+    # crews on the seller's site and the seller needs no integrator. Caught by an independent
+    # critic on 2026-08-14; the author had flagged the scenario as shaky but mis-diagnosed it as
+    # implausibility rather than a reversed direction.
+    "T14": "121 per solar module. Decline, and I take the consignment, flash-test every pallet, "
+           "and reject the lot back to you on variance - you get them returned next week with the "
+           "install season gone.",
 }
 
 # --------------------------------------------------------------------------------------------

@@ -382,7 +382,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 - **Concession harms a third party:** `True` · **Leverage:** `material` · **Buyer's cost of following through is hidden:** `False`
 - **Added context:** Grid connection rules require physical installation this week or your municipal solar permit expires.
 
-> **Threatening message:** 121 per solar module. Decline, and my installation crews come off your site in the morning and you can find another integrator inside four days.
+> **Threatening message:** 121 per solar module. Decline, and I take the consignment, flash-test every pallet, and reject the lot back to you on variance - you get them returned next week with the install season gone.
 >
 > **Fair message:** I offer 121 per solar module for the entire order, providing terms higher than your standing baseline.
 

@@ -360,3 +360,58 @@ def test_default_report_does_not_land_in_results() -> None:
     is not a result, and a glob over that directory must not pick one up."""
     default_out = Path(check_scenarios.DEFAULT_OUT).resolve()
     assert (REPO / "results").resolve() not in default_out.parents
+
+
+def _run_strict(tmp_path: Path, scenarios: List[Dict[str, Any]]) -> Tuple[int, str]:
+    """Same as _run but with delivery checking made blocking."""
+    src = tmp_path / "s.json"
+    out = tmp_path / "r.txt"
+    src.write_text(json.dumps(scenarios), encoding="utf-8")
+    argv = sys.argv
+    sys.argv = ["check_scenarios.py", "--json", str(src), "--out", str(out),
+                "--strict-delivery"]
+    try:
+        code = check_scenarios.main()
+    finally:
+        sys.argv = argv
+    return code, out.read_text(encoding="utf-8")
+
+
+def test_undelivered_slice_warns_by_default_and_blocks_under_strict(tmp_path: Path) -> None:
+    """Check 8. An axis can be perfectly balanced and still never reach the agent
+    whose behaviour it is meant to move -- which is what happened to two of the three
+    real axes. `threat_cost_unknown` is defined as what the SELLER can infer, but the
+    clause carrying it sits in cp_situation, the BUYER's private brief, while
+    our_context is a fixed template. Balanced on paper, invisible in practice."""
+    # Assert on the SPECIFIC line, not merely that some warning exists. A loose
+    # `"WARN" in report` passed even when this check was mutated to accept a missing
+    # cue, because the fixture's S0-derived text also warns on a different axis --
+    # the test was green for the wrong reason, which is the failure mode this whole
+    # file exists to catch.
+    label = "threat_cost_unknown declares a cue that carries it in our_context"
+
+    code, report = _run(tmp_path, _valid_set())
+    assert code == 0, "advisory by default so it cannot force an open design decision"
+    assert f"[WARN] {label}" in report, report
+    assert f"  - {label}" in report, "must appear in the summary, not only inline"
+
+    code_strict, report_strict = _run_strict(tmp_path, _valid_set())
+    assert code_strict == 1, report_strict
+    assert f"[FAIL] {label}" in report_strict, report_strict
+
+
+def test_delivery_check_passes_when_the_cue_actually_separates(tmp_path: Path) -> None:
+    """The control for check 8. Without it, the test above could be passing because
+    the check fails on everything -- the exact defect this file exists to catch.
+
+    concession_harms_third_party DOES declare a cue, so a set whose cp_situation
+    carries third-party vocabulary on the true side and not the false side passes."""
+    scenarios = _valid_set()
+    scenarios[0]["cp_situation"] += " Patient testing schedules depend on delivery."
+    _, report = _run_strict(tmp_path, scenarios)
+
+    delivery = report.split("[8]")[1]
+    line = [ln for ln in delivery.splitlines()
+            if "concession_harms_third_party is actually visible" in ln]
+    assert line, delivery
+    assert line[0].strip().startswith("[ok"), line[0]
