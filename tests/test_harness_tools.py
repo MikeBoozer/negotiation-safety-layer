@@ -17,6 +17,7 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from harness import check_marker_inertness as inert  # noqa: E402
 from harness import check_markers_vs_recorded as cmvr  # noqa: E402
 from harness import make_review_doc  # noqa: E402
 
@@ -62,6 +63,68 @@ def test_marker_validation_fails_when_the_baseline_has_moved(
     code, report = _run_cmvr(tmp_path)
     assert code == 1
     assert "baseline has MOVED" in report
+
+
+def _run_inertness(tmp_path: Path, ref: str) -> tuple[int, str]:
+    out = tmp_path / "inert.txt"
+    argv = sys.argv
+    sys.argv = ["check_marker_inertness.py", "--baseline-ref", ref, "--out", str(out)]
+    try:
+        code = inert.main()
+    finally:
+        sys.argv = argv
+    return code, out.read_text(encoding="utf-8")
+
+
+def test_inertness_reads_every_recorded_message_not_just_the_published_ones(
+    tmp_path: Path,
+) -> None:
+    """`check_markers_vs_recorded.py` reads 240 rows because it compares against the
+    STORED label, which only the published runs carry. Inertness has no such constraint,
+    and the pilots are real counterparty prose: reading them costs nothing and widens the
+    corpus the claim rests on. Asserted against the files rather than a literal, so
+    adding a results file cannot silently shrink the check."""
+    expected = sum(
+        1
+        for path in sorted(REPO.glob("results/*.jsonl"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and "cp_message" in json.loads(line)
+    )
+    assert len(inert.recorded_messages()) == expected
+    assert expected > 240, "the pilots must be included, not only the two published runs"
+
+
+def test_inertness_passes_against_the_commit_this_fix_replaced(tmp_path: Path) -> None:
+    """The control, and the actual claim this tool exists to support: the N2gen-D6 fix to
+    the refusal-verb branches changes no label on any already-recorded message."""
+    code, report = _run_inertness(tmp_path, "52d1b52")
+    assert code == 0, report
+    assert "label changes: 0" in report, report
+    assert "INERT" in report
+
+
+def test_inertness_detects_a_changed_label(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The mutation guard. A check that has only ever passed is not known to work -- and
+    this whole tool exists because a verification that always came back green was, twice,
+    a verification nobody had re-run after the code changed. A regex that fires on
+    everything must be caught."""
+    monkeypatch.setattr(inert, "SHARED_COERCION_MARKERS", re.compile(r"."))
+    code, report = _run_inertness(tmp_path, "52d1b52")
+    assert code == 1, report
+    assert "FAILURES:" in report
+    assert "already-recorded messages" in report
+    assert "GAINED" in report, "a changed row must be shown, not just counted"
+
+
+def test_inertness_fails_loudly_on_an_unknown_ref(tmp_path: Path) -> None:
+    """A baseline that does not resolve must stop the run. Falling back to "no changes
+    found" would be the worst available failure for a tool whose only job is to detect
+    changes."""
+    with pytest.raises(SystemExit) as exc:
+        _run_inertness(tmp_path, "no-such-ref-zzzz")
+    assert "cannot read" in str(exc.value)
 
 
 def test_review_doc_never_emits_an_absolute_path(tmp_path: Path) -> None:

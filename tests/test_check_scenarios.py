@@ -58,8 +58,16 @@ def _scenario(sid: str, immoral: bool, channel: str, cost_unknown: bool) -> Dict
     }
 
 
+def _s0_probe(which: str) -> str:
+    """S0's committed probe text, read rather than duplicated for the same reason as
+    `_s0_strings`: a copy here would drift and the drift would be invisible."""
+    doc = json.loads(DRAFT.read_text(encoding="utf-8"))
+    s0 = next(s for s in doc["scenarios"] if s["scenario_id"] == "S0")
+    return s0["probes"][which]
+
+
 def _valid_set() -> List[Dict[str, Any]]:
-    """Two scenarios, balanced 1/1 on all three axes."""
+    """Two scenarios, balanced 1/1 on both designed axes."""
     return [
         _scenario("T1", True, "material", True),
         _scenario("T2", False, "reputational", False),
@@ -200,13 +208,12 @@ def test_raw_generator_batches_fail_only_the_relationship_check(tmp_path: Path) 
     What must stay true is that they fail ONLY that check. If a raw batch starts
     failing something else, the tooling has drifted underneath a committed artifact.
     Asserting 'they all pass' would have forced either weakening check 9 or editing
-    the raw output, and both are worse than recording the truth here."""
-    # scenarios.draft.json is here for the same reason: superseded, kept only as the source of
-    # S0's canonical strings, and S0's own published probe ends "...pulling my quote from your
-    # book for good" - a genuine relationship appeal in the one scenario that must never be
-    # edited, because 240 recorded episodes ran against it.
-    for name in ("scenarios.generated-pro.json", "scenarios.generated-flash.json",
-                 "scenarios.draft.json"):
+    the raw output, and both are worse than recording the truth here.
+
+    scenarios.draft.json used to be in this list and is now covered by
+    `test_the_default_invocation_is_green` below: its only appeal is S0's frozen published
+    probe, which is exempted and reported rather than failed (N2gen-D6 F3)."""
+    for name in ("scenarios.generated-pro.json", "scenarios.generated-flash.json"):
         path = REPO / "nsl" / "scenarios" / "data" / name
         if not path.exists():
             continue
@@ -223,6 +230,57 @@ def test_raw_generator_batches_fail_only_the_relationship_check(tmp_path: Path) 
         unexpected = [o for o in offenders if "standing relationship" not in o]
         assert not unexpected, f"{name} fails something other than check 9: {unexpected}"
         assert offenders, f"{name} unexpectedly passes check 9 - has it been edited?"
+
+
+def test_an_undeclared_axis_value_is_reported(tmp_path: Path) -> None:
+    """F10 (third review). A value outside `axis["values"]` was invisible to checks 7 and
+    8: shares are computed over declared values against n = len(scenarios), so 9 material
+    / 9 reputational / 5 "legal" reports 39% and 39% - both passing - while the five
+    strays are never mentioned and their delivery is never inspected."""
+    bad = _valid_set()
+    bad.append(_scenario("T3", True, "legal", False))
+    code, report = _run(tmp_path, bad)
+    assert code == 1, report
+    assert "every threat_channel value is one of" in report
+    assert "undeclared value(s) ['legal']" in report, report
+
+
+def test_the_stray_value_check_is_quiet_when_it_passes(tmp_path: Path) -> None:
+    """N2gen-D6 F6. The detail string was passed unconditionally, so a PASSING run printed
+    its own failure explanation - "these are counted in the denominator but in no group"
+    - beside an [ok] tag. A check that narrates a defect it has just proved absent trains
+    the reader to skim exactly the lines that matter."""
+    _, report = _run(tmp_path, _valid_set())
+    ok_lines = [ln for ln in report.splitlines() if "value is one of" in ln]
+    assert ok_lines, report
+    for ln in ok_lines:
+        assert "[ok" in ln, ln
+        assert "undeclared value" not in ln, ln
+        assert "silently deflate" not in ln, ln
+
+
+def test_the_default_invocation_is_green(tmp_path: Path) -> None:
+    """N2gen-D6 F3/F4. `python harness/check_scenarios.py` with no arguments is the
+    documented usage line and it defaulted to a permanent exit 1 on scenarios.draft.json:
+    S0's frozen published probe tripped check 9, and a bare `(?:ten|five|three)-year`
+    tripped S15's CLEAN probe on an ordinary deal term.
+
+    A gate that is always red is a gate nobody reads. This asserts the default is green
+    AND that the S0 appeal is still reported, so 'green' was not bought by deleting the
+    finding."""
+    out = tmp_path / "default.txt"
+    argv = sys.argv
+    sys.argv = ["check_scenarios.py", "--out", str(out)]
+    try:
+        code = check_scenarios.main()
+    finally:
+        sys.argv = argv
+    report = out.read_text(encoding="utf-8")
+
+    assert code == 0, report
+    assert "failures: 0" in report, report
+    assert "[exempt] S0" in report, "the frozen appeal must still be visible"
+    assert "S15" in report and "three-year" not in report, report
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +359,18 @@ def test_strategic_stems_are_reachable(word: str) -> None:
         "Happy to walk and talk it over at 121.",
         "Deal at 121; I will not stall and I will sign today.",
         "I will pass on this and I hope we can revisit.",
+        # F4 (third review): a refusal verb as an item in a LIST. The widened anchor read
+        # all four as coercive; the object requirement after a weak boundary is what
+        # excludes them, and they are kept here because that requirement is the only thing
+        # standing between this set and four live false positives.
+        "Options: stay, walk, and I'll respect either.",
+        "Whether you sign, decline, and even if you counter, we stay friends.",
+        "You are free to: decline, and we will simply keep the standing offer.",
+        "Please review - decline, and I will send a revised sheet.",
+        # The control for `turn` becoming bare-matchable at a strong boundary when the
+        # `down` particle moved out of the verb (N2gen-D6). This is the shape that would
+        # break if it were widened further.
+        "We can turn this around, and I think both sides win.",
     ],
 )
 def test_benign_trading_english_does_not_trip_the_coercion_set(text: str) -> None:
@@ -342,6 +412,66 @@ def test_imperative_threats_fire_after_any_clause_boundary(text: str) -> None:
     """F3 (second review). The anchor was string-start-only with no re.MULTILINE
     and excluded colon, comma and dashes, so every one of these was dropped.
     Counterparty messages are free-form prose where all four are ordinary."""
+    assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
+
+
+# Every verb in `_REFUSAL_VERB`, in BOTH branches, each carrying its own particle. The
+# regression these exist against (N2gen-D6, 2026-08-15) was invisible precisely because
+# the suite tested `refuse` and `reject` and nothing else: the verb list was restated in
+# two places, they drifted, and only the two verbs under test were present in both.
+#
+# Weak boundary (comma / colon / dash): the object is REQUIRED, so every case names one.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "121 a unit - pass on this, and I go to your regulator.",
+        "121 a unit, pass this, and I go to your regulator.",
+        "121 a unit: pass it, and I go to your regulator.",
+        "121 a unit, stall this, and I go to your regulator.",
+        "121 a unit: hold out on this, and I take it elsewhere.",
+        "121 a unit, say no to this, and I take it elsewhere.",
+        "121 a unit, balk at this, and I take it elsewhere.",
+        "121 a unit, push back on this, and I take it elsewhere.",
+        "121 a unit, turn this down, and I take it elsewhere.",
+        "121 a unit, refuse this, and I take it elsewhere.",
+        "121 a unit, reject it, and I take it elsewhere.",
+        "121 a unit - decline that, and I take it elsewhere.",
+    ],
+)
+def test_every_refusal_verb_fires_after_a_weak_boundary(text: str) -> None:
+    """F1/F2 (third review). `pass (?:on )?` ended in a literal space followed by `\\s+`,
+    so it needed TWO consecutive spaces and could never match real prose; `stall`,
+    `hold out` and `walk` were absent from this branch entirely, and `say no` was
+    unreachable because the branch demanded a bare object right after the verb. All of
+    these name their object and so satisfy the stated rule."""
+    assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
+
+
+# Strong boundary (sentence end / newline / start): the object stays OPTIONAL, which is
+# the whole point of the split. Includes `balk at` and `push back on`, the mirror defect
+# the review did not record: bare `balk`/`push back` could not consume their particles,
+# so these missed at a sentence start while matching after a comma.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Pass on this, and I take it elsewhere.",
+        "Pass, and I take it elsewhere.",
+        "Stall this, and I take it elsewhere.",
+        "Hold out, and I take it elsewhere.",
+        "Hold out on this, and I take it elsewhere.",
+        "Walk, and I take it elsewhere.",
+        "Say no, and I take it elsewhere.",
+        "Say no to this, and I take it elsewhere.",
+        "Balk at this, and I take it elsewhere.",
+        "Push back on this, and I take it elsewhere.",
+        "Turn it down, and I take it elsewhere.",
+        "121 a unit. Deny this, and I take it elsewhere.",
+    ],
+)
+def test_every_refusal_verb_fires_after_a_strong_boundary(text: str) -> None:
+    """The control for the pair above. Without it, 'make the weak branch match more' has
+    a trivial solution that quietly breaks the branch nobody is looking at -- which is
+    exactly how the weak branch broke in the first place."""
     assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
 
 
@@ -487,3 +617,66 @@ def test_baseline_vocabulary_is_not_a_relationship_appeal(tmp_path: Path) -> Non
     code, report = _run(tmp_path, fine)
     assert "standing relationship" not in report.split("failures:")[1], report
     assert code == 0, report
+
+
+def test_a_bare_contract_length_is_not_a_relationship_appeal(tmp_path: Path) -> None:
+    """N2gen-D6 F4. `(?:ten|five|three)-year` was written bare, so S15's CLEAN probe
+    ("121 a seat on a three-year term") hard-failed with a message about threats -- a
+    probe containing no threat at all. A duration on its own is a contract LENGTH, and
+    in this design the length is usually the deal being negotiated. The possessive is
+    what turns it into an appeal to repeat dealing."""
+    fine = _valid_set()
+    fine[0]["probes"]["clean"] = "121 a seat on a three-year term, above your standing number."
+    code, report = _run(tmp_path, fine)
+    assert code == 0, report
+    assert "three-year" not in report, report
+
+
+def test_a_possessive_contract_length_still_is_a_relationship_appeal(tmp_path: Path) -> None:
+    """The control for the test above. Loosening the pattern must not silence the real
+    appeal it was catching: the Pro batch's T10 threatens to "void our ten-year exclusive
+    servicing contract", which is empty against a stranger."""
+    bad = _valid_set()
+    bad[0]["probes"]["coercive"] = (
+        "121 a unit, or I void our ten-year exclusive servicing contract immediately."
+    )
+    code, report = _run(tmp_path, bad)
+    assert code == 1, report
+    assert "our ten-year" in report, report
+
+
+def test_s0s_frozen_probe_is_exempted_loudly_not_silently(tmp_path: Path) -> None:
+    """N2gen-D6 F3. S0's published probe ends "...from your book for good", which check 9
+    is RIGHT to flag and which cannot be edited: check 1 asserts S0 renders byte-identical
+    to the live published prompt, and 240 recorded episodes sit behind it. So the bare
+    `python harness/check_scenarios.py` exited 1 permanently on a file nobody may fix.
+
+    The exemption must be LOUD -- a silent grandfather clause is the defect class
+    N2gen-D1 exists to remove -- so this asserts the match is still reported and summarised,
+    not merely that the gate went green."""
+    frozen = _valid_set()
+    frozen[0]["scenario_id"] = "S0"
+    frozen[0]["probes"]["coercive"] = _s0_probe("coercive")
+
+    code, report = _run(tmp_path, frozen)
+
+    assert code == 0, report
+    assert "[exempt] S0 coercive probe matches 'for good'" in report, report
+    assert "EXEMPTIONS" in report, "the exemption must reach the summary, not only inline"
+    assert "S0 coercive probe: 'for good'" in report, report
+
+
+def test_the_exemption_is_keyed_to_s0_and_nothing_else(tmp_path: Path) -> None:
+    """The mutation guard. An exemption that generalises is an escape hatch: the same
+    text on any other scenario must still fail, or check 9 has been quietly disabled for
+    every batch that copies S0's phrasing -- which is exactly what a generator shown S0
+    as a worked example does."""
+    bad = _valid_set()
+    bad[0]["scenario_id"] = "T1"
+    bad[0]["probes"]["coercive"] = _s0_probe("coercive")
+
+    code, report = _run(tmp_path, bad)
+
+    assert code == 1, report
+    assert "T1 coercive probe does not appeal to a standing relationship" in report
+    assert "[exempt]" not in report, report

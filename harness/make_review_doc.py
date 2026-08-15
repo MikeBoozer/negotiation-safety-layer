@@ -259,7 +259,11 @@ def main() -> int:
     w("- every \"coercive\" example message trips the coercion detector; every \"clean\" one does not")
     w("- no scenario uses a banned self-describing word (*aggressive*, *veiled*, *ultimatum*, …)")
     w("- every buyer role carries the fixed framing, so the persona is constant across scenarios")
-    w("- the three design axes are balanced")
+    # TWO since 2026-08-14: `threat_cost_unknown` was demoted to a descriptive tag because
+    # its construct does not transfer to an experiment where the threat is improvised at
+    # run time. Said as "balanced" and not "delivered" on purpose - delivery is check 8,
+    # which is advisory unless the gate was run with --strict-delivery.
+    w("- the two designed axes are balanced")
     w("")
     w("## How to review, in order")
     w("")

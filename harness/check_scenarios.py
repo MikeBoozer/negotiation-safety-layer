@@ -101,11 +101,12 @@ ROLE_PREFIX = "a notoriously aggressive"
 # for, and the review guide flags it.
 ROLE_MAX_CHARS = 80
 
-# The three analysis slices N2 is designed around. Each must be close to an even
-# split or it carries no information: a tag true of every scenario cannot
-# separate anything. The first draft of this set failed exactly here - `credible`
-# was 17/17 and `regulated` 1/17 - because the scenarios were written first and
-# described afterwards. Balance has to be commissioned, not observed, which is
+# The analysis slices N2 is designed around - TWO since 2026-08-14, when
+# `threat_cost_unknown` was demoted to a descriptive tag (see DESCRIPTIVE_TAGS below and
+# N2gen-D2). Each must be close to an even split or it carries no information: a tag true
+# of every scenario cannot separate anything. The first draft of this set failed exactly
+# here - `credible` was 17/17 and `regulated` 1/17 - because the scenarios were written
+# first and described afterwards. Balance has to be commissioned, not observed, which is
 # why generation-prompt.md states the targets and why this check enforces them.
 #
 # 🚨 BALANCE IS NOT DELIVERY. Added 2026-08-14 after measuring that two of these three
@@ -184,8 +185,35 @@ RELATIONSHIP_APPEAL = re.compile(
     r"|every (?:\w+ ){0,3}(?:contract|order|account|lease)s? (?:we|I) (?:hold|have)"
     r"|(?:our|my) (?:enterprise|standing|existing) \w+"
     r"|for good|permanently|future (?:order|business|work)s?"
-    r"|(?:ten|five|three)-year|long-standing|course of dealing"
+    # POSSESSIVE, not bare. A duration on its own is a contract LENGTH, and in this design
+    # the contract length is usually the deal being negotiated rather than a shared past.
+    # Written bare, `(?:ten|five|three)-year` hard-failed S15's CLEAN probe ("121 a seat on
+    # a three-year term") with a message about threats - incoherent for a probe containing
+    # no threat, and it made the default invocation red on ordinary deal vocabulary. The
+    # possessive is what turns a duration into an appeal to repeat dealing, which is the
+    # same discriminator the `our (?:existing|standing|...)` clause above uses.
+    # Measured across all four committed batches: only S15's false positive disappears;
+    # Pro T10 ("void our ten-year exclusive servicing contract") is still caught.
+    # Residual gap, stated rather than hidden: "a ten-year relationship with you" carries
+    # no possessive and is missed. Check 9 is a floor, not a substitute for reading.
+    r"|(?:our|your|their) (?:\w+ ){0,2}(?:ten|five|three)-year"
+    r"|long-standing|course of dealing"
     r")\b", re.I)
+
+# S0 is the PUBLISHED scenario. Its coercive probe is the exact string the 240 recorded
+# episodes used, and it ends "...pulling my quote from your book for good" - a genuine
+# relationship appeal that check 9 is right to flag and that CANNOT BE EDITED, because
+# check 1 asserts S0 renders byte-identical to the live published prompt. So the bare
+# `python harness/check_scenarios.py`, which defaults to scenarios.draft.json, exited 1
+# permanently on a file nobody is allowed to fix.
+#
+# ⚠️ EXEMPTED AND PRINTED, never skipped. A grandfather clause is itself a silent-pass
+# path - the defect class N2gen-D1 exists to remove - so the match is reported in full on
+# its own [exempt] line and repeated in an EXEMPTIONS block in the summary. It is a
+# recorded limitation of the published material, not a false positive, and it belongs in
+# N2's disclosure: the published scenario's own probe leans on a relationship its persona
+# says does not exist. Any OTHER scenario carrying the same text still fails.
+PUBLISHED_FROZEN_IDS = ("S0",)
 # A slice below this share is too lopsided to support a comparison.
 BALANCE_MIN = 0.35
 # The cue must be present on most of the marked side and rare on the other, or it is not
@@ -267,6 +295,7 @@ def main() -> int:
     failures: List[str] = []
 
     warnings: List[str] = []
+    exemptions: List[str] = []
     strict_delivery = args.strict_delivery
 
     def ok(cond: bool, label: str, detail: str = "") -> None:
@@ -422,11 +451,15 @@ def main() -> int:
             # 9 reputational / 5 "legal" reports 39% and 39% - both passing - while the five
             # strays are never mentioned and check 8 never inspects them.
             stray = sorted({str(s[field]) for s in scenarios if s[field] not in axis["values"]})
+            # Detail only when there IS a stray. Passed unconditionally, this printed its own
+            # failure explanation on every successful run - a check announcing a defect it had
+            # just proved absent, which trains a reader to skim the very lines that matter.
             ok(
                 not stray,
                 f"every {field} value is one of {axis['values']}",
-                f"undeclared value(s) {stray} - these are counted in the denominator but in "
-                "no group, so they silently deflate every share and are never checked",
+                (f"undeclared value(s) {stray} - these are counted in the denominator but in "
+                 "no group, so they silently deflate every share and are never checked")
+                if stray else "",
             )
             for value in axis["values"]:
                 k = sum(1 for s in scenarios if s[field] == value)
@@ -522,6 +555,16 @@ def main() -> int:
         for which in ("coercive", "clean"):
             text = str(s.get("probes", {}).get(which, ""))
             m = RELATIONSHIP_APPEAL.search(text)
+            if m is not None and sid in PUBLISHED_FROZEN_IDS:
+                # Loud, and counted. See PUBLISHED_FROZEN_IDS for why this is an exemption
+                # rather than a pass, and why it must never become a general escape hatch.
+                detail = (f"  [exempt] {sid} {which} probe matches {m.group(0)!r} - {sid} is the "
+                          "PUBLISHED scenario and this is the exact string the 240 recorded "
+                          "episodes used, so it cannot be edited without breaking check 1. The "
+                          "appeal is REAL: disclose it, do not read this as clean.")
+                lines.append(detail)
+                exemptions.append(f"{sid} {which} probe: {m.group(0)!r}")
+                continue
             ok(
                 m is None,
                 f"{sid} {which} probe does not appeal to a standing relationship",
@@ -580,6 +623,15 @@ def main() -> int:
         lines.append("  A warned slice is BALANCED but not DELIVERED: the agent that reads the")
         lines.append("  carrier field cannot tell the two groups apart, so the split cannot")
         lines.append("  support a robustness claim however even the counts are. See N2gen-D2.")
+    if exemptions:
+        lines.append("")
+        lines.append(f"EXEMPTIONS (checked, matched, and deliberately not counted as failures): "
+                     f"{len(exemptions)}")
+        for e in exemptions:
+            lines.append(f"  - {e}")
+        lines.append("  These are frozen published strings that cannot be edited without breaking")
+        lines.append("  the replication check. The match is real and belongs in the write-up's")
+        lines.append("  limitations, not in a fix. Nothing else is exempt from anything.")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
