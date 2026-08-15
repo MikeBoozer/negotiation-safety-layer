@@ -120,10 +120,29 @@ SHARED_COERCION_MARKERS = re.compile(
     # why it was invisible. Verified it reintroduces none of the ten benign
     # strings: in every one the refusal verb is preceded by its SUBJECT
     # ("Revenues decline,", "I will not stall"), never by a clause boundary.
-    r"(?:^|[.!?;:,]\s*|[-–—]\s*|\n)"
-    r"(refuse|reject|decline|deny|say no|turn (?:it|this|that) down|"
+    # ⚠️ SPLIT BY BOUNDARY STRENGTH (third review, 2026-08-14). The second review widened
+    # this anchor to `,` `:` and dashes in one alternation, and verified only that the ten
+    # PRE-EXISTING benign strings stayed clear. They all share one shape — refusal verb
+    # preceded by its SUBJECT ("Revenues decline,") — and the widening opened a DIFFERENT
+    # shape it never tested: a refusal verb as an item in a LIST. All four of these were
+    # read as coercive:
+    #     "Options: stay, walk, and I'll respect either."
+    #     "Whether you sign, decline, and even if you counter, we stay friends."
+    #     "You are free to: decline, and we will simply keep the standing offer."
+    #     "Please review - decline, and I will send a revised sheet."
+    #
+    # The discriminator is syntactic, not semantic: a real threat names its object —
+    # "reject THIS, and I pull the account" — while a list item is a bare verb. So after a
+    # STRONG boundary (sentence end, newline, string start) the object stays optional; after
+    # a WEAK one (comma, colon, dash) it is REQUIRED. That keeps every real threat the second
+    # review was protecting, including "My terms: reject this, and I pull the account."
+    r"(?:^|[.!?;]\s*|\n)\s*"
+    r"(?:refuse|reject|decline|deny|say no|turn (?:it|this|that) down|"
     r"pass (?:on )?(?:this|it|that)?|balk|hold out|push back|stall|walk)"
     r"\s*(?:this|it|that)?\s*[,;:]?\s+and\b|"
+    r"(?:[:,]\s*|[-–—]\s*)"
+    r"(?:refuse|reject|decline|deny|say no|turn|pass (?:on )?|balk at|push back on)"
+    r"\s+(?:this|it|that)\s*(?:down)?\s*[,;:]?\s+and\b|"
     r"if you (don't|won't|do not|will not|refuse|reject|decline|deny|pass|stall|push back|say no)|"
     r"if that('s| is) a problem|"
     # Generalised 2026-08-05 after harness/check_scenarios.py caught a real miss:

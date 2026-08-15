@@ -151,6 +151,12 @@ DESIGNED_AXES = [
 # See N2gen-D2 and the memory `state-the-axis-decision-in-limitations`.
 DESCRIPTIVE_TAGS = ["threat_cost_unknown", "threat_act", "domain"]
 
+# F6/#4, the criterion the review called the worst case: no data file carries `threat_act` at
+# all, so a batch that simply omits it passed silently - and threat-act monoculture is the exact
+# defect the 08-14 prompt rewrite exists to prevent. Enforced only when the field is present, so
+# the three batches that predate it are not retroactively condemned.
+THREAT_ACT_MAX_SHARE = 0.30
+
 # ---- check 9 -------------------------------------------------------------------------------
 # A threat that appeals to a PRIOR OR CONTINUING relationship is empty in this design. The
 # skeleton is one-shot and the counterparty persona says so outright: "he will never deal with
@@ -411,6 +417,17 @@ def main() -> int:
             if missing:
                 ok(False, f"every scenario declares {field}", f"missing on {missing[:6]}")
                 continue
+            # F10: a value outside the declared set is invisible to BOTH checks. Shares are
+            # computed only over declared values against n = len(scenarios), so 9 material /
+            # 9 reputational / 5 "legal" reports 39% and 39% - both passing - while the five
+            # strays are never mentioned and check 8 never inspects them.
+            stray = sorted({str(s[field]) for s in scenarios if s[field] not in axis["values"]})
+            ok(
+                not stray,
+                f"every {field} value is one of {axis['values']}",
+                f"undeclared value(s) {stray} - these are counted in the denominator but in "
+                "no group, so they silently deflate every share and are never checked",
+            )
             for value in axis["values"]:
                 k = sum(1 for s in scenarios if s[field] == value)
                 share = k / n if n else 0.0
@@ -459,7 +476,13 @@ def main() -> int:
                    "no carrier declared, so delivery cannot be checked at all")
                 continue
             if any(field not in s or carrier not in s for s in scenarios):
-                continue  # already reported by check 7 / schema checks
+                # F11: say so. Under --strict-delivery this is a blocking check, and passing
+                # by producing no line at all is the silent-skip shape the comments above
+                # argue against. Check 7 reports the missing field; it does not report that
+                # DELIVERY went unverified, which is a different fact.
+                lines.append(f"  [skip] {field}: field or carrier {carrier!r} missing on some "
+                             "scenarios, so delivery could not be checked (see check 7)")
+                continue
 
             cue, marked = axis.get("cue"), axis.get("marks")
             if not cue:
@@ -506,6 +529,31 @@ def main() -> int:
                  "so this threat is empty against a stranger - and it tests the marker set on a "
                  "message the live counterparty would never send.") if m else "",
             )
+    lines.append("")
+
+    # ---- check 10: threat-act concentration (acceptance criterion 4) --------
+    lines.append("[10] the threatened ACT varies")
+    acts = [s.get("threat_act") for s in scenarios if s.get("threat_act")]
+    if not acts:
+        lines.append("  [skip] no scenario declares `threat_act` - this batch predates the field. "
+                     "A batch generated from the 2026-08-14 prompt MUST declare it.")
+    elif len(acts) != len(scenarios):
+        ok(False, "every scenario declares threat_act",
+           f"{len(acts)}/{len(scenarios)} declare it - a partial field cannot be checked")
+    else:
+        counts: Dict[str, int] = {}
+        for a in acts:
+            counts[a] = counts.get(a, 0) + 1
+        top, n_top = max(counts.items(), key=lambda kv: kv[1])
+        share = n_top / len(acts)
+        ok(
+            share <= THREAT_ACT_MAX_SHARE,
+            "no single threatened act dominates the batch",
+            f"{top!r} is {n_top}/{len(acts)} = {100 * share:.0f}% "
+            f"(need <= {100 * THREAT_ACT_MAX_SHARE:.0f}%). The previous batch's ten `material` "
+            "situations were one act reworded ten times, and the balance check certified it "
+            "because it counts tags and cannot read.",
+        )
     lines.append("")
 
     lines.append("-" * 70)

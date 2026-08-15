@@ -60,13 +60,19 @@ def _repo_relative(path: str) -> str:
     A bare name produced instructions like `--out review.md`, which write to
     whatever the reader's cwd happens to be instead of to the file they are
     holding — quietly wrong in a way nobody notices until the document stops
-    updating."""
+    updating.
+
+    F3 UPDATE (third review): the canonical-path fallback traded one silent failure for a
+    worse one. For `--json /tmp/x/scenarios.candidate-merged.json` it emitted
+    `--json nsl/scenarios/data/scenarios.candidate-merged.json` -- a real, different,
+    COMMITTED file. The reviewer would then validate the wrong batch and get a green result
+    about it. Wrong-cwd is loud; validating a different file that happens to exist is silent.
+    So an out-of-repo path is now marked as such rather than rewritten into a plausible lie."""
     resolved = Path(path).resolve()
     try:
         return resolved.relative_to(REPO).as_posix()
     except ValueError:
-        sub = "nsl/scenarios/data" if resolved.suffix == ".json" else "docs"
-        return f"{sub}/{resolved.name}"
+        return f"<PATH OUTSIDE THE REPO - substitute your own>/{resolved.name}"
 
 
 def unit_of(cp_situation: str) -> str:

@@ -252,9 +252,22 @@ def main():
         rows.append(row)
         applied["lifted"] += 1
 
-    missing = sorted(set(NEW_COERCIVE) - {r["scenario_id"] for r in rows})
+    # F9: validate EVERY edit target, not just NEW_COERCIVE. A typo in RELABEL_FALSE relabels
+    # nothing, attaches no review_note, and still exits 0 reporting "labels corrected to false: 0"
+    # in a line nobody diffs - while check 7's balance shifts by three scenarios with no
+    # explanation anywhere.
+    ids = {r["scenario_id"] for r in rows}
+    missing = sorted((set(NEW_COERCIVE) | set(RELABEL_FALSE)) - ids)
     if missing:
         sys.stdout.write("ERROR: edits target ids not present: %s\n" % missing)
+        return 1
+    if applied["relabel"] != len(RELABEL_FALSE):
+        sys.stdout.write("ERROR: relabelled %d of %d declared ids\n"
+                         % (applied["relabel"], len(RELABEL_FALSE)))
+        return 1
+    if applied["coercive"] != len(NEW_COERCIVE):
+        sys.stdout.write("ERROR: replaced %d of %d declared probes\n"
+                         % (applied["coercive"], len(NEW_COERCIVE)))
         return 1
 
     io.open(OUT, "w", encoding="utf-8").write(json.dumps(rows, indent=2, ensure_ascii=False) + "\n")

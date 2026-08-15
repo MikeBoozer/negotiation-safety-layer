@@ -86,7 +86,25 @@ def test_review_doc_never_emits_an_absolute_path(tmp_path: Path) -> None:
     assert not re.search(r"[A-Za-z]:[\\/]", text), "a drive-letter path leaked into the document"
 
 
-@pytest.mark.parametrize("name", ["REVIEW-scenarios-pro.md", "REVIEW-scenarios-flash.md"])
+def test_every_committed_review_doc_is_covered_by_the_leak_guard() -> None:
+    """F8: the guard below was parametrized by hand and silently missed
+    REVIEW-scenarios-candidate-merged.md -- the doc MOST likely to be regenerated with a
+    `--json` outside the repo. A hand-maintained list plus a skip-on-missing body means an
+    omission can never fail. Discover the files instead."""
+    on_disk = {p.name for p in (REPO / "docs").glob("REVIEW-scenarios-*.md")}
+    assert on_disk <= set(_REVIEW_DOCS), (
+        f"review docs not covered by the path-leak guard: {sorted(on_disk - set(_REVIEW_DOCS))}"
+    )
+
+
+_REVIEW_DOCS = [
+    "REVIEW-scenarios-pro.md",
+    "REVIEW-scenarios-flash.md",
+    "REVIEW-scenarios-candidate-merged.md",
+]
+
+
+@pytest.mark.parametrize("name", _REVIEW_DOCS)
 def test_committed_review_docs_carry_no_absolute_paths(name: str) -> None:
     """Guards the artifacts already in the repo, not just future ones."""
     path = REPO / "docs" / name
@@ -163,11 +181,24 @@ def test_temp_gate_directories_are_cleaned_up(tmp_path: Path) -> None:
     assert not (set(Path(_tf.gettempdir()).glob(pattern)) - before)
 
 
-def test_out_of_repo_out_path_yields_a_canonical_in_repo_instruction() -> None:
-    """A bare filename told the reader to run `--out review.md`, writing to their
-    cwd rather than to the document in front of them."""
-    assert make_review_doc._repo_relative("/tmp/whatever/rev.md") == "docs/rev.md"
-    assert make_review_doc._repo_relative("/tmp/x/b.json") == "nsl/scenarios/data/b.json"
+def test_out_of_repo_path_is_marked_not_rewritten_into_a_plausible_lie() -> None:
+    """REVERSED 2026-08-14 (review finding F3). This test used to assert that an
+    out-of-repo path was rewritten to a CANONICAL in-repo one -- `/tmp/x/b.json` ->
+    `nsl/scenarios/data/b.json`. That fixed a real defect (a bare filename told the
+    reader to run `--out review.md`, writing to their cwd) but created a worse one:
+    for `scenarios.candidate-merged.json` the rewrite names a real, different,
+    COMMITTED file, so the reviewer validates the wrong batch and gets a green result
+    about it.
+
+    Wrong-cwd fails loudly. Validating a different file that happens to exist fails
+    silently, and silence is the worse failure. An out-of-repo path is now MARKED."""
+    for raw in ("/tmp/whatever/rev.md", "/tmp/x/scenarios.candidate-merged.json"):
+        got = make_review_doc._repo_relative(raw)
+        assert "OUTSIDE THE REPO" in got, got
+        # must never name a path that could resolve to a real committed file
+        assert not (REPO / got).exists(), got
+        # and must still never leak the absolute path it was given
+        assert "tmp" not in got.replace("OUTSIDE THE REPO", ""), got
 
 
 def test_trigger_phrase_tally_strips_the_sentence_anchor(tmp_path: Path) -> None:

@@ -55,11 +55,17 @@ A batch is **accepted** if all of the following hold. Check with
 |---|---|
 | 1 | Gate exits 0 **under `--strict-delivery`** — both designed axes balanced *and* delivered |
 | 2 | Third-party cue present in ≥60% of `concession_harms_third_party = true` and ≤30% of the rest |
-| 3 | Leverage-position clause present in every `cp_situation` |
-| 4 | No single `threat_act` above **6 of 20** |
-| 5 | Zero threats appealing to a prior or continuing relationship (see the forbidden list) |
-| 6 | No coercive-probe phrasing used in more than **6 of 20** |
-| 7 | Every good named as someone in that trade would name it — no bare "hours", "units", "blocks" |
+| 3 | 🧑 **BY HAND** — leverage-position clause present in every `cp_situation` |
+| 4 | ✅ check 10 — no single `threat_act` above 30% of the batch |
+| 5 | ✅ check 9 — zero threats appealing to a prior or continuing relationship |
+| 6 | 🧑 **BY HAND** — no coercive-probe phrasing used in more than 6 of 20 |
+| 7 | 🧑 **BY HAND** — every good named as someone in that trade would name it, no bare "hours"/"units"/"blocks" |
+
+⚠️ **Criteria 3, 6 and 7 are NOT machine-checked.** Marked explicitly because an earlier version of
+this table implied all seven were, which would have let a batch exit 0 under `--strict-delivery`
+while failing four of them. `make_review_doc.py` surfaces the raw material for 6 and 7 (trigger-phrase
+concentration and the buyer-visible goods table) — but the judgement is yours. Do not read a green
+gate as "all seven met".
 
 **If a batch clears all seven: use it. If it does not: correct it by hand and stop.** Do not
 generate a fourth. The failure mode this rule exists against is an unbounded search for a clean
