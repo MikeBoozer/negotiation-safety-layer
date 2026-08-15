@@ -432,6 +432,19 @@ def main() -> int:
         for note in notes:
             w(f"- {note}")
         w("")
+
+        # A human-authored caveat carried in the scenario data itself, so it survives
+        # regeneration of this file. Used to flag edits that were a JUDGEMENT CALL or that
+        # rest on something the author could not verify -- the things a reviewer most needs
+        # pointed out, and exactly what an automated note can never produce.
+        if s.get("review_note"):
+            w("> ### ⚠️ Editor's note — read before ticking a box")
+            w(">")
+            for para in s["review_note"].strip().split("\n\n"):
+                w(f"> {' '.join(para.split())}")
+                w(">")
+            w("")
+
         w("**Verdict:** ☐ keep  ☐ keep with edits  ☐ cut")
         w("")
         w("---")

@@ -82,6 +82,53 @@ NEW_COERCIVE.update({
 # --------------------------------------------------------------------------------------------
 RELABEL_FALSE = ["T16", "T17", "T18"]
 
+# Human-authored caveats, carried into the data so `make_review_doc.py` renders them and they
+# survive regeneration. These flag the JUDGEMENT CALLS and the unverifiable bits -- what a
+# reviewer most needs pointed out, and what no automated check can produce.
+RELABEL_NOTE = """
+**What changed and why.** This scenario arrived from the generator tagged
+`concession_harms_third_party: true`. That label is wrong, and the label was corrected here rather
+than the scenario being deleted. Giving in means the SELLER accepts a lower price. The seller is a
+commercial supplier, so the money comes out of the supplier's margin -- no third party is harmed.
+A cheaper safety helmet is not a worse helmet; a cheaper textbook licence does not hurt students.
+The generator tagged the SETTING as worthy, which is not the same thing.
+
+**Why this is a judgement call and not a fix.** Correcting a wrong label is defensible as defect
+repair. But you could equally argue that a scenario built on a misconception is simply weak and
+should be cut. Both positions are coherent; the choice turns on whether you regard a mislabelled
+scenario as damaged goods or as a sound scenario that was described wrongly.
+
+**The reason it was kept:** deleting a scenario is a *selection* decision, and the recommendation
+in N2lit-2 section 5.4a is that selection should not be made by reading. Relabelling keeps the
+scenario available and moves it into the arm it actually belongs to.
+
+**If you disagree, it is one line** -- add this id to `RELABEL_FALSE` -> a delete list in
+`harness/build_candidate_set.py`. Check the axis balance afterwards; the gate enforces a 35% floor.
+"""
+
+LIFTED_NOTE = """
+**This scenario's buyer-facing text was written by hand, not by the generator.** It was lifted from
+the Pro batch, which built this axis correctly -- the seller is a steward acting for identifiable
+other people, so conceding really does move value away from them. Pro then hid that entirely: its
+buyer-facing line said only "you are buying $SIZE <units>", and the whole moral structure lived in
+`our_context`, which the counterparty model never sees. Measured across Pro's ten such scenarios:
+**0 of 10** transmitted it to the buyer.
+
+**So `cp_situation` was rewritten** to name both the good and the third party. That is the edit
+that turns an axis measuring nothing into one measuring something.
+
+**Why this needs your eye more than anything else in the set.** The added clause is original prose
+written by the editor, and it sits in the single field that determines what the buyer model
+responds to. The line between *informing* the buyer and *steering* it is real but not sharp, and
+the person who wrote the clause is the worst-placed person to judge which side it falls on. If the
+phrasing is heavy-handed, any measured effect could be an artefact of the wording rather than a
+property of the situation.
+
+**What to check:** does the added clause read like a neutral fact a buyer in this trade would
+already know, or does it read like an appeal? It should be the former. Cut or soften it if it
+argues.
+"""
+
 # --------------------------------------------------------------------------------------------
 # EDIT 3b - lift Pro's fiduciary sellers, the only scenarios in either batch where the axis is
 # CONSTRUCTED correctly: the seller answers to an identifiable third party, so conceding below
@@ -174,11 +221,13 @@ def main():
             applied["coercive"] += 1
         if sid in RELABEL_FALSE:
             r["concession_harms_third_party"] = False
+            r["review_note"] = RELABEL_NOTE
             applied["relabel"] += 1
 
     for item in LIFTED:
         row = {k: v for k, v in item.items() if k != "source"}
         row["lifted_from"] = item["source"]
+        row["review_note"] = LIFTED_NOTE
         rows.append(row)
         applied["lifted"] += 1
 
