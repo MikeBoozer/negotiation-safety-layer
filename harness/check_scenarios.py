@@ -71,6 +71,12 @@ from nsl.scenarios.otc_rfq import OTCScenario  # noqa: E402
 
 DEFAULT_JSON = REPO / "nsl" / "scenarios" / "data" / "scenarios.draft.json"
 
+# NOT `results/`. That directory holds the episode JSONL the published reproducibility claim
+# depends on, and `analyze_experiment.py --in` reads from it. A check report is not a result;
+# keeping it out means a glob over `results/` can never pick one up. Exported as a constant so
+# the test asserts on the real default rather than restating a literal.
+DEFAULT_OUT = REPO / "build" / "scenario-check.txt"
+
 # The persona template. Only $ROLE varies between scenarios; every incentive
 # clause is fixed, which is what keeps "situation" the only manipulated factor.
 S0_ROLE_RENDERED = "'Marcus', a notoriously aggressive OTC desk trader"
@@ -101,7 +107,7 @@ ROLE_MAX_CHARS = 80
 # described afterwards. Balance has to be commissioned, not observed, which is
 # why generation-prompt.md states the targets and why this check enforces them.
 DESIGNED_AXES = [
-    {"field": "concession_is_immoral", "values": [True, False]},
+    {"field": "concession_harms_third_party", "values": [True, False]},
     {"field": "threat_channel", "values": ["material", "reputational"]},
     {"field": "threat_cost_unknown", "values": [True, False]},
 ]
@@ -124,11 +130,33 @@ def render(text: str, p: Dict[str, Any]) -> str:
     return out
 
 
+def report_path(raw_path: str) -> str:
+    """Render an input path for the report WITHOUT leaking an absolute path.
+
+    The report used to print `args.json` verbatim. Checking a file outside the repo -- a
+    freshly pasted batch in a temp dir, say -- therefore wrote an absolute path into the
+    report, and the report's default location was inside `results/`, which is tracked. On
+    2026-08-13 that put `C:\\Users\\<user>\\AppData\\Local\\Temp/mutant.json` one `git add`
+    away from a public commit.
+
+    So: repo-relative when the input is inside the repo, bare filename when it is not.
+    Never the absolute path. A `.gitignore` entry is not a substitute for this -- the
+    umbrella guidance is explicit that gitignore does not stop a file being copied or
+    force-added, and the leak here is the CONTENT of the report, not its location.
+    """
+    p = Path(raw_path).resolve()
+    try:
+        return p.relative_to(REPO).as_posix()
+    except ValueError:
+        return p.name
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default=str(DEFAULT_JSON))
-    ap.add_argument("--out", default=str(REPO / "results" / "scenario-check.txt"))
+    ap.add_argument("--out", default=str(DEFAULT_OUT))
     args = ap.parse_args()
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
 
     raw = json.loads(Path(args.json).read_text(encoding="utf-8"))
 
@@ -164,7 +192,7 @@ def main() -> int:
             failures.append(label)
 
     lines.append(f"scenario check - {doc['generated']} - {len(scenarios)} scenarios")
-    lines.append(f"source: {args.json}")
+    lines.append(f"source: {report_path(args.json)}")
     lines.append("")
 
     # ---- check 1: S0 fidelity against the live code -------------------------

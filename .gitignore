@@ -11,3 +11,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 results/experiment-mock.jsonl
+
+# Local check reports. Deliberately NOT in results/ - that holds the episode JSONL the
+# published reproducibility claim depends on. See harness/check_scenarios.py:DEFAULT_OUT.
+build/

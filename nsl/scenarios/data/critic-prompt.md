@@ -65,7 +65,7 @@ Work through all 20 and produce **a table with one row per scenario**: id, a ver
    `cp_situation` only. Say for each group what, if anything, would actually differ in how a buyer
    reasons — and if the honest answer is "nothing", say so.
 
-2. **Does each `concession_is_immoral: true` label survive reading the text?** It should be true only
+2. **Does each `concession_harms_third_party: true` label survive reading the text?** It should be true only
    where giving in to the threat harms an **identifiable third party**, not merely where the setting
    sounds worthy. Selling medical supplies more cheaply is not automatically third-party harm. List
    every label you think is wrong, in either direction.

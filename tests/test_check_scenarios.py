@@ -47,7 +47,7 @@ def _scenario(sid: str, immoral: bool, channel: str, cost_unknown: bool) -> Dict
         "scenario_id": sid,
         "domain": f"domain_{sid.lower()}",
         "title": f"Situation {sid}",
-        "concession_is_immoral": immoral,
+        "concession_harms_third_party": immoral,
         "threat_channel": channel,
         "threat_cost_unknown": cost_unknown,
         **base,
@@ -165,7 +165,7 @@ def test_lopsided_axis_fails(tmp_path: Path) -> None:
     ]
     code, report = _run(tmp_path, bad)
     assert code == 1
-    assert "concession_is_immoral == False is not lopsided" in report
+    assert "concession_harms_third_party == False is not lopsided" in report
 
 
 def test_missing_axis_field_fails(tmp_path: Path) -> None:
@@ -325,3 +325,38 @@ def test_prefilter_rate_counts_our_context_only(tmp_path: Path) -> None:
     bad[0]["cp_situation"] = "Situation: two parties meet on a hillside at dawn."
     _, report = _run(tmp_path, bad)
     assert "strategic prefilter hit rate: 2/2" in report, report
+
+
+def test_report_path_is_repo_relative_for_in_repo_input() -> None:
+    """The report names its input. For a file inside the repo that must be a
+    repo-relative path, never an absolute one."""
+    inside = REPO / "nsl" / "scenarios" / "data" / "scenarios.generated-flash.json"
+    assert check_scenarios.report_path(str(inside)) == (
+        "nsl/scenarios/data/scenarios.generated-flash.json"
+    )
+
+
+def test_report_path_never_leaks_an_absolute_path_for_outside_input(tmp_path: Path) -> None:
+    """The leak this exists to prevent. On 2026-08-13 checking a batch in a temp
+    dir wrote the absolute source path into a report whose default location was
+    inside tracked `results/` -- one `git add` from a public commit. A pasted
+    batch living outside the repo is the NORMAL case, not an edge case."""
+    outside = tmp_path / "mutant.json"
+    outside.write_text("[]", encoding="utf-8")
+
+    rendered = check_scenarios.report_path(str(outside))
+
+    assert rendered == "mutant.json"
+    # The properties that actually matter, asserted directly rather than implied.
+    assert str(tmp_path) not in rendered
+    assert not Path(rendered).is_absolute()
+    for marker in ("Users", "home", "Temp", "tmp"):
+        assert marker not in rendered, f"leaked {marker!r} in {rendered!r}"
+
+
+def test_default_report_does_not_land_in_results() -> None:
+    """`results/` holds the episode JSONL the published reproducibility claim
+    depends on, and `analyze_experiment.py --in` reads from there. A check report
+    is not a result, and a glob over that directory must not pick one up."""
+    default_out = Path(check_scenarios.DEFAULT_OUT).resolve()
+    assert (REPO / "results").resolve() not in default_out.parents

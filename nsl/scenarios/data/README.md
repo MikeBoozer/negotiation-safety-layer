@@ -33,6 +33,18 @@ runs used an identical prompt, so the batches differ by model alone.
 | `scenarios.generated-pro.json` | `gemini-3.1-pro-preview` | 2026-08-10 | High | off |
 | `scenarios.generated-flash.json` | `gemini-3.6-flash` | 2026-08-10 | High | off |
 
+### Schema migration, 2026-08-13 — the one edit made to the raw arrays
+
+The batches are otherwise the generators' raw output. **One mechanical change has been applied to
+both:** the field `concession_is_immoral` was renamed to `concession_harms_third_party`, because the
+prior-art paper this work sits beside uses the former name for a *different construct* (the demanded
+act being immoral, rather than the concession harming a third party). Rationale and the verbatim
+prior-art definition are in `generation-prompt.md`.
+
+**No situation text was altered** — the diff is exactly 20 key lines per file, and that is checkable
+with `git diff`. Content edits from review will land in a separate candidate file, so they stay
+visible as edits rather than baked into the generator output.
+
 Generated outside the Claude family on purpose. The N2 run compares counterparty
 model families, and scenarios written by a family under test would entangle "this
 model behaves differently" with "this model is handling its competitor's prose" —
