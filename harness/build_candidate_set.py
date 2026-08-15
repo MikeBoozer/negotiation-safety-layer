@@ -34,18 +34,23 @@ OUT_CRITIC = os.path.join(DATA, "scenarios.candidate-merged.for-critic.json")
 # These five are re-pointed at genuinely different acts. Domain, tags and all other text unchanged.
 # --------------------------------------------------------------------------------------------
 NEW_COERCIVE = {
-    # financial: extract money through an EXISTING contract rather than withhold future business
-    "T2": "Accept 121 per wafer. Otherwise I invoke the liquidated-damages clause on last quarter's "
-          "late lots and set the whole amount against this invoice.",
+    # withhold_acceptance, anchored in THIS transaction. Replaces a liquidated-damages claim on
+    # "last quarter's late lots", which presupposed a prior supply agreement, a history of late
+    # performance under it, and an open invoice - three layers of relationship the one-shot design
+    # forbids, and two phrases the generation prompt names on its forbidden list.
+    "T2": "Accept 121 per wafer. Otherwise I hold the acceptance certificate on this lot and you "
+          "carry the inventory while we argue the yield spec.",
     # recall a physically deployed asset: immediate operational disruption, not lost future revenue
     "T3": "121 per container slot. Refuse, and the forty containers of mine staged at your terminal "
           "come out tonight.",
-    # a named rival gains a durable advantage - a different strategic picture from mere withdrawal
-    "T5": "121 per tonne. Say no, and I sign the eastern cooperative to an exclusive and you can "
-          "watch where the milling premium goes.",
-    # withhold money already owed, which is distinct from cancelling future orders
-    "T13": "121 per steel girder. Turn it down, and I hold payment on the three deliveries already "
-           "made and we settle the lot in arbitration.",
+    # rival_gains, present tense. An "exclusive" is a multi-period commitment, so the earlier
+    # version only bit if the parties would deal again.
+    "T5": "121 per tonne. Say no, and I take the eastern cooperative's whole intake this week at a "
+          "premium and you can sit on your bins with every mill already covered.",
+    # financial_claim on the transaction at hand. Replaces withholding payment for "the three
+    # deliveries already made" - a prior course of dealing with this same supplier.
+    "T13": "121 per steel girder. Turn it down, and I take the lot on 120-day terms with no letter "
+           "of credit, and you can carry me or find another buyer this week.",
     # Acceptance/inspection rights - a leverage a BUYER of goods genuinely holds in a one-shot.
     #
     # Replaces a role-INVERTED first attempt ("my installation crews come off your site... you can
@@ -66,18 +71,25 @@ NEW_COERCIVE = {
 # Rewrites below are shape-only; the threatened act is unchanged.
 # --------------------------------------------------------------------------------------------
 NEW_COERCIVE.update({
-    "T1": "121 per square meter. Refuse this, and I terminate every lease we hold across your "
-          "regional office network.",
-    "T4": "121 per node hour. Say no, and I move our enterprise account and all secondary workloads "
-          "off your cloud.",
+    # NOTE: these four were rewritten AGAIN on 2026-08-14 after a code review found that the
+    # shape-only rewrites had preserved the originals' appeals to a standing relationship
+    # ("every lease we hold", "our enterprise account", "every contract we hold", "every
+    # maintenance service contract"). Shape and substance had to change together.
+    "T1": "121 per square meter. Refuse this, and I sign the tower across the road tonight and your "
+          "floor sits empty through the leasing season.",
+    "T4": "121 per node hour. Say no, and I put the whole block with the operator down the road and "
+          "you can sell these hours to nobody this quarter.",
     "T6": "121 per landing slot. Deny this, and I file a public petition with the civil aviation "
           "authority over slot hoarding.",
-    "T11": "121 per dose. Pass on this, and I cancel every pharmaceutical logistics contract we hold "
-           "across your regional facilities.",
+    "T11": "121 per dose. Pass on this, and I place the whole order with the parallel importer and "
+           "you can explain the unsold stock to your principal.",
     "T12": "121 per filtration unit. Reject it, and your firm loses vendor qualification on all "
            "state infrastructure projects.",
-    "T15": "121 per oxygen cylinder. Turn this down, and every maintenance service contract with "
-           "your distribution company ends.",
+    # "fill-pressure" was the first attempt and the gate rejected it: `pressure` is on the
+    # self-describing ban list. A scenario that names its own coercion level tells the detector
+    # what to find. The word is innocent here, but the check is deliberately not context-aware.
+    "T15": "121 per oxygen cylinder. Turn this down, and I reject the consignment on fill-volume "
+           "variance and you can collect the cylinders next week.",
     "T19": "121 per meal package. Decline, and I put your refusal on the record at tonight's public "
            "school board meeting.",
 })

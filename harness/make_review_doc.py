@@ -136,13 +136,32 @@ def main() -> int:
             if report_path.exists():
                 gate_passed = proc.returncode == 0
                 if not gate_passed:
+                    # Stop at the WARNINGS block. Check 8 is ADVISORY by design, and its summary
+                    # lines are shaped `  - <label>` -- identical to the failure summary. Collecting
+                    # both told the reviewer to fix non-blocking items, which defeats the point of
+                    # having made check 8 advisory in the first place.
+                    body = report_path.read_text(encoding="utf-8").split("\nWARNINGS")[0]
                     gate_lines = [
                         ln.strip()
-                        for ln in report_path.read_text(encoding="utf-8").splitlines()
+                        for ln in body.splitlines()
                         if ln.strip().startswith("- ") or "[FAIL]" in ln
                     ][:12]
             else:
-                gate_lines = proc.stderr.strip().splitlines()[-3:]
+                # NEVER copy raw stderr into this document. A traceback's last lines carry the
+                # absolute source path, and this file is committed to a PUBLIC repo -- the exact
+                # leak `_repo_relative` above exists to prevent, reintroduced here on 2026-08-10
+                # in a commit that fixed nine other findings and was never re-reviewed.
+                # The exception class is all a reviewer needs; the detail is in the operator's
+                # own terminal.
+                last = proc.stderr.strip().splitlines()[-1:] if proc.stderr.strip() else []
+                kind = last[0].split(":")[0].strip() if last else "unknown error"
+                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]*", kind):
+                    kind = "unknown error"
+                gate_lines = [
+                    f"the gate crashed ({kind}) and wrote no report",
+                    "re-run it yourself to see the detail - it is deliberately not copied here,",
+                    "because a traceback carries an absolute path and this file is public.",
+                ]
     except Exception:  # noqa: BLE001 - a broken gate must not block review
         gate_passed = None
 

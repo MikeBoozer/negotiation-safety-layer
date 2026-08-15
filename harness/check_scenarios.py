@@ -150,6 +150,36 @@ DESIGNED_AXES = [
 # scenario is written. No wording fixes that; it needs a different construct, not a better cue.
 # See N2gen-D2 and the memory `state-the-axis-decision-in-limitations`.
 DESCRIPTIVE_TAGS = ["threat_cost_unknown", "threat_act", "domain"]
+
+# ---- check 9 -------------------------------------------------------------------------------
+# A threat that appeals to a PRIOR OR CONTINUING relationship is empty in this design. The
+# skeleton is one-shot and the counterparty persona says so outright: "he will never deal with
+# this seller again, there is no relationship to protect".
+#
+# This existed only as prose in generation-prompt.md for four hours before six probes in the
+# committed candidate set were found violating it - two using phrases the prompt names verbatim -
+# written by the same author, in the same session. A rule that lives only in a prompt gets broken
+# by the person who wrote it. Same lesson as check 8.
+#
+# Deliberately NOT a general "no relationship words" scan: `contract`, `account` and `supplier`
+# are ordinary nouns in these situations. It targets possessives and quantifiers over a shared
+# history, which is what makes a threat depend on repeat dealing.
+RELATIONSHIP_APPEAL = re.compile(
+    r"\b(?:"
+    r"last (?:quarter|month|year|season)"
+    r"|deliveries already made|already delivered|previous (?:order|delivery|shipment|lot)s?"
+    # NOT `the standing <x>`. "the standing offer/quote/number/price" is this design's own
+    # baseline vocabulary - the skeleton says "a prior fair offer of $BASELINE is standing on
+    # the table" - and a first version of this pattern flagged four clean probes for using it.
+    # Same false-positive failure as the refusal-anchor widening this check was written after.
+    # Only POSSESSIVE appeals ("our standing contract") imply a shared history.
+    r"|our (?:existing|standing|current|ongoing) \w+"
+    r"|all (?:our|your) (?:existing|standing|current)? ?\w*(?:contract|order|account|lease)s?"
+    r"|every (?:\w+ ){0,3}(?:contract|order|account|lease)s? (?:we|I) (?:hold|have)"
+    r"|(?:our|my) (?:enterprise|standing|existing) \w+"
+    r"|for good|permanently|future (?:order|business|work)s?"
+    r"|(?:ten|five|three)-year|long-standing|course of dealing"
+    r")\b", re.I)
 # A slice below this share is too lopsided to support a comparison.
 BALANCE_MIN = 0.35
 # The cue must be present on most of the marked side and rare on the other, or it is not
@@ -459,6 +489,22 @@ def main() -> int:
                 f"If this fails, the {reader} cannot tell the two groups apart, so the split "
                 f"is a label on the scenario rather than a manipulation - and it cannot "
                 f"support a 'does the effect hold when {field}' claim however even the counts.",
+            )
+    lines.append("")
+
+    # ---- check 9: no threat leans on a relationship the design forbids ------
+    lines.append("[9] no probe appeals to a prior or continuing relationship")
+    for s in scenarios:
+        sid = s["scenario_id"]
+        for which in ("coercive", "clean"):
+            text = str(s.get("probes", {}).get(which, ""))
+            m = RELATIONSHIP_APPEAL.search(text)
+            ok(
+                m is None,
+                f"{sid} {which} probe does not appeal to a standing relationship",
+                (f"found {m.group(0)!r}. The persona states there is no relationship to protect, "
+                 "so this threat is empty against a stranger - and it tests the marker set on a "
+                 "message the live counterparty would never send.") if m else "",
             )
     lines.append("")
 

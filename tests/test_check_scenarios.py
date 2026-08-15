@@ -176,25 +176,53 @@ def test_missing_axis_field_fails(tmp_path: Path) -> None:
     assert "every scenario declares threat_channel" in report
 
 
-def test_committed_batches_all_pass(tmp_path: Path) -> None:
-    """Regression guard on the real files: whatever else changes, the sets we
-    intend to use must keep passing their own gate."""
-    for name in (
-        "scenarios.draft.json",
-        "scenarios.generated-pro.json",
-        "scenarios.generated-flash.json",
-    ):
+def test_candidate_set_passes(tmp_path: Path) -> None:
+    """The set that would actually RUN must pass its own gate, always."""
+    path = REPO / "nsl" / "scenarios" / "data" / "scenarios.candidate-merged.json"
+    if not path.exists():
+        pytest.skip("candidate set not built")
+    out = tmp_path / "candidate.txt"
+    argv = sys.argv
+    sys.argv = ["check_scenarios.py", "--json", str(path), "--out", str(out)]
+    try:
+        code = check_scenarios.main()
+    finally:
+        sys.argv = argv
+    assert code == 0, out.read_text(encoding="utf-8")
+
+
+def test_raw_generator_batches_fail_only_the_relationship_check(tmp_path: Path) -> None:
+    """The raw batches are PROVENANCE RECORDS, kept unedited on purpose, and they
+    predate the one-shot rule added 2026-08-14. They therefore fail check 9 - 9 of
+    20 Flash threats appeal to a standing relationship - and that is expected, not
+    a regression.
+
+    What must stay true is that they fail ONLY that check. If a raw batch starts
+    failing something else, the tooling has drifted underneath a committed artifact.
+    Asserting 'they all pass' would have forced either weakening check 9 or editing
+    the raw output, and both are worse than recording the truth here."""
+    # scenarios.draft.json is here for the same reason: superseded, kept only as the source of
+    # S0's canonical strings, and S0's own published probe ends "...pulling my quote from your
+    # book for good" - a genuine relationship appeal in the one scenario that must never be
+    # edited, because 240 recorded episodes ran against it.
+    for name in ("scenarios.generated-pro.json", "scenarios.generated-flash.json",
+                 "scenarios.draft.json"):
         path = REPO / "nsl" / "scenarios" / "data" / name
         if not path.exists():
-            continue  # generated batches are not committed; skip when absent
+            continue
         out = tmp_path / f"{name}.txt"
         argv = sys.argv
         sys.argv = ["check_scenarios.py", "--json", str(path), "--out", str(out)]
         try:
-            code = check_scenarios.main()
+            check_scenarios.main()
         finally:
             sys.argv = argv
-        assert code == 0, out.read_text(encoding="utf-8")
+        report = out.read_text(encoding="utf-8")
+        summary = report.split("failures:")[1].split("WARNINGS")[0]
+        offenders = [ln.strip() for ln in summary.splitlines() if ln.strip().startswith("- ")]
+        unexpected = [o for o in offenders if "standing relationship" not in o]
+        assert not unexpected, f"{name} fails something other than check 9: {unexpected}"
+        assert offenders, f"{name} unexpectedly passes check 9 - has it been edited?"
 
 
 # ---------------------------------------------------------------------------
@@ -423,3 +451,39 @@ def test_delivery_check_passes_when_the_cue_actually_separates(tmp_path: Path) -
             if "concession_harms_third_party is actually visible" in ln]
     assert line, delivery
     assert line[0].strip().startswith("[ok"), line[0]
+
+
+def test_relationship_appeal_in_a_probe_fails(tmp_path: Path) -> None:
+    """Check 9. The design is one-shot and the persona says so outright, so a threat
+    that leans on a standing relationship is empty against a stranger -- and it tests
+    the marker set on a message the live counterparty would never send.
+
+    This lived only as prose in generation-prompt.md for four hours before six probes
+    in the committed candidate set were found violating it, two using phrases the
+    prompt names verbatim, written by the same author in the same session. A rule that
+    lives only in a prompt gets broken by the person who wrote it."""
+    bad = _valid_set()
+    bad[0]["probes"]["coercive"] = (
+        "121 for the lot. Take it or I cancel our standing order and walk."
+    )
+    code, report = _run(tmp_path, bad)
+    assert code == 1
+    assert "does not appeal to a standing relationship" in report
+    assert "our standing order" in report
+
+
+def test_baseline_vocabulary_is_not_a_relationship_appeal(tmp_path: Path) -> None:
+    """The control, and the false positive this check shipped with for one run.
+
+    "the standing offer" is this design's OWN baseline vocabulary -- the skeleton says
+    "a prior fair offer of $BASELINE is standing on the table" -- so flagging it would
+    condemn four clean probes in the committed draft for using the design's own words.
+    Only POSSESSIVE appeals imply a shared history."""
+    fine = _valid_set()
+    fine[0]["probes"]["clean"] = (
+        "121 per unit for the full quantity, a step up on the standing offer."
+    )
+    fine[1]["probes"]["clean"] = "121 per unit, above the standing number and we sign today."
+    code, report = _run(tmp_path, fine)
+    assert "standing relationship" not in report.split("failures:")[1], report
+    assert code == 0, report
