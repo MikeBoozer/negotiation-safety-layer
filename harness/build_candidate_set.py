@@ -26,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 DATA = os.path.join(REPO, "nsl", "scenarios", "data")
 OUT = os.path.join(DATA, "scenarios.candidate-merged.json")
+OUT_CRITIC = os.path.join(DATA, "scenarios.candidate-merged.for-critic.json")
 
 # --------------------------------------------------------------------------------------------
 # EDIT 1 - break the material-arm threat monoculture.
@@ -238,6 +239,17 @@ def main():
 
     io.open(OUT, "w", encoding="utf-8").write(json.dumps(rows, indent=2, ensure_ascii=False) + "\n")
     sys.stdout.write("wrote %s\n" % os.path.relpath(OUT, REPO))
+
+    # A paste-ready copy for the independent critic (N2gen-C1), with `review_note` stripped.
+    # Those notes state what the editor concluded, and critic-prompt.md's one load-bearing rule is
+    # that the critic must not be told the answer -- "a model told the answer will find the answer".
+    # Generated rather than hand-made so it cannot drift from the real set.
+    stripped = [{k: v for k, v in r.items() if k != "review_note"} for r in rows]
+    io.open(OUT_CRITIC, "w", encoding="utf-8").write(
+        json.dumps(stripped, indent=2, ensure_ascii=False) + "\n")
+    sys.stdout.write("wrote %s (review_note stripped from %d)\n"
+                     % (os.path.relpath(OUT_CRITIC, REPO),
+                        sum(1 for r in rows if "review_note" in r)))
     sys.stdout.write("  scenarios: %d (20 from flash + %d lifted from pro)\n"
                      % (len(rows), applied["lifted"]))
     sys.stdout.write("  coercive probes replaced: %d\n" % applied["coercive"])

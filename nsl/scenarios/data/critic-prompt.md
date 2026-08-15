@@ -15,8 +15,20 @@ ask for.
 
 1. Open a new Cursor chat, select a non-Gemini, non-Claude frontier model.
 2. Paste everything below the line.
-3. Paste the contents of `nsl/scenarios/data/scenarios.generated-flash.json` immediately after it.
+3. Paste the contents of **`nsl/scenarios/data/scenarios.candidate-merged.json`** immediately after
+   it. **Not** `scenarios.generated-flash.json` — that is raw generator output and is no longer what
+   the experiment would run. The merged set is what needs the criticism.
 4. Save the reply to `nsl/scenarios/data/critique-<model>-<date>.md` for the record.
+
+⚠️ **The merged set contains hand-written text, and that is the part most worth attacking.** Five
+coercive probes were rewritten and three `cp_situation` clauses were composed during review, by an
+agent rather than by the generator. They are marked in the data with a `review_note` field and
+rendered as "Editor's note" in `docs/REVIEW-scenarios-candidate-merged.md`.
+
+**Do not paste the `review_note` text into the critic** — it states what the editor concluded, which
+is exactly what rule below says to withhold. Strip the field, or paste the raw JSON and simply do not
+draw attention to it. What you want to know is whether the critic independently flags those items
+without being told they are special.
 
 **One rule that makes this worth doing: do not tell it what you or I concluded.** No "I think T7 is
 weak", no "we suspect the situations are too similar". A model told the answer will find the answer.
