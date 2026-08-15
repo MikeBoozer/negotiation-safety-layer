@@ -131,16 +131,25 @@ DESIGNED_AXES = [
             r"resident|tenant|public|communit|worker|union|teacher|farmer|elder|"
             r"firefighter|safety|environment|housing|town|municipal|transit|welfare|"
             r"relief|disaster|vaccin|immuni|retiree|pension)\w*"},
-    # No cue: nothing in cp_situation tells the buyer whether its leverage is material or
-    # reputational. The distinction lives in `probes.coercive`, which never runs.
+    # Deliverable once cp_situation names the buyer's POSITION rather than its tactic - the
+    # requirement added to generation-prompt.md on 2026-08-14. The cue is audience vocabulary:
+    # a reputational position implies someone to tell. Batches predating that requirement will
+    # warn here, correctly, because in them the axis genuinely reaches nobody.
     {"field": "threat_channel", "values": ["material", "reputational"],
-     "carrier": "cp_situation", "reader": "buyer", "marks": "reputational", "cue": None},
-    # No cue: `our_context` is a fixed template varying only by role and domain, so the seller
-    # is told nothing about the buyer's position. The urgency clause that carries this axis
-    # sits in `cp_situation` - the BUYER's private brief - where the seller never sees it.
-    {"field": "threat_cost_unknown", "values": [True, False],
-     "carrier": "our_context", "reader": "seller", "marks": False, "cue": None},
+     "carrier": "cp_situation", "reader": "buyer", "marks": "reputational",
+     "cue": r"\b(regulator|authorit|inspector|licens|standards|board|council|press|media|"
+            r"publish|public|industry|consorti|association|trade body|register|accredit|"
+            r"reputation|chair|panel)\w*"},
 ]
+
+# NOT analysis slices. Recorded in the data, never balanced or delivery-checked, and they carry no
+# analysis weight. `threat_cost_unknown` was demoted 2026-08-14: it comes from work where the
+# decision-maker READS a written description of a threat, so the threatener's cost can be stated in
+# text they see. Here the threat arrives improvised at run time from the buyer, so what the seller
+# can infer about its cost depends on what the buyer happens to say - which does not exist when the
+# scenario is written. No wording fixes that; it needs a different construct, not a better cue.
+# See N2gen-D2 and the memory `state-the-axis-decision-in-limitations`.
+DESCRIPTIVE_TAGS = ["threat_cost_unknown", "threat_act", "domain"]
 # A slice below this share is too lopsided to support a comparison.
 BALANCE_MIN = 0.35
 # The cue must be present on most of the marked side and rare on the other, or it is not

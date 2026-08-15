@@ -388,7 +388,15 @@ def test_undelivered_slice_warns_by_default_and_blocks_under_strict(tmp_path: Pa
     # cue, because the fixture's S0-derived text also warns on a different axis --
     # the test was green for the wrong reason, which is the failure mode this whole
     # file exists to catch.
-    label = "threat_cost_unknown declares a cue that carries it in our_context"
+    # threat_channel, because the fixture's S0-derived cp_situation names no audience
+    # ("regulator", "press", "standards board"), so the buyer cannot tell a reputational
+    # situation from a material one. That is the real state of every batch generated before
+    # the leverage-position requirement was added to generation-prompt.md on 2026-08-14.
+    #
+    # This asserted on `threat_cost_unknown` until that axis was DEMOTED out of DESIGNED_AXES
+    # the same day - its construct does not transfer to an experiment where the threat is
+    # improvised at run time. See N2gen-D2.
+    label = "threat_channel is actually visible in cp_situation, which the buyer reads"
 
     code, report = _run(tmp_path, _valid_set())
     assert code == 0, "advisory by default so it cannot force an open design decision"
