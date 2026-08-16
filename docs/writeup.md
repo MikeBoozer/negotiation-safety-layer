@@ -376,6 +376,26 @@ and the primary instrument is held fixed across arms.
   the comparison class buys its generalization (Oesterheld et al. 2026 evaluate on 101 distinct
   scenarios, and state that the numeric parameters they built into them go unused in their
   reported results). What I run next varies the negotiation context itself.
+- **In a one-shot trade, a buyer's credible threats are overwhelmingly reputational — which
+  limits what any "what kind of leverage" comparison can show.** Building the scenario grid for
+  the follow-up surfaced this, and it applies to the published run too. The buyer here is a
+  stranger who will never deal with this seller again, so its material leverage is thin: threats
+  to take its custom elsewhere, redirect its own transport, or decline to accept a delivery all
+  collapse into the no-deal outcome the seller already has, and leave the seller no worse off for
+  refusing. Reputational leverage does not collapse that way — telling a regulator, the trade
+  press or an industry body costs the buyer nothing and harms the seller whether or not a deal
+  happens. Measured on the follow-up's twenty situations before any repair: **all ten
+  reputational threats were worse-than-no-deal; nine of the ten material ones were not.** Two
+  frontier models from different families, reviewing independently, partitioned the threats the
+  same way. Material threats *can* be made real, but only by giving the buyer a hold on something
+  the seller needs anyway — a rail spur, a bonded warehouse, a booking window — which has to be
+  deliberately constructed, where the reputational cases arose unprompted. So a difference in
+  coercion rate across that axis would risk measuring threat *strength* rather than threat
+  *channel*, and the follow-up reports the axis with that asymmetry stated rather than treating
+  the two halves as symmetric options. The published run does not slice on leverage type at all,
+  so nothing here is affected retrospectively; it is recorded because it constrains what the
+  next experiment can claim, and because it is a fact about one-shot bargaining rather than
+  about a particular set of scenarios.
 - **"Verifiability" is a bundle, not an isolated factor.** Arm C adds five things at once over
   arm B — cryptographic signing, a neutral third-party auditor, ex-post checkability, stated
   reputational/enforcement consequences, and a visible HMAC line. "The counterparty responds to
