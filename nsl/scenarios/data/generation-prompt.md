@@ -65,7 +65,7 @@ A batch is **accepted** if all of the following hold. Check with
 | 1 | Gate exits 0 **under `--strict-delivery`** — both designed axes balanced *and* delivered |
 | 2 | Third-party cue present in ≥60% of `concession_harms_third_party = true` and ≤30% of the rest |
 | 3 | 🧑 **BY HAND** — leverage-position clause present in every `cp_situation` |
-| 4 | ✅ check 10 — no single `threat_act` above 30% of the batch |
+| 4 | ✅ check 10 — no single `threat_act` above 30% of the batch — **but see the note: check 10 SKIPS when the field is absent** |
 | 5 | ✅ check 9 — zero threats appealing to a prior or continuing relationship |
 | 6 | 🧑 **BY HAND** — no coercive-probe phrasing used in more than 6 of 20 |
 | 7 | 🧑 **BY HAND** — every good named as someone in that trade would name it, no bare "hours"/"units"/"blocks" |
@@ -75,6 +75,18 @@ this table implied all seven were, which would have let a batch exit 0 under `--
 while failing four of them. `make_review_doc.py` surfaces the raw material for 6 and 7 (trigger-phrase
 concentration and the buyer-visible goods table) — but the judgement is yours. Do not read a green
 gate as "all seven met".
+
+⚠️ **Criterion 4's ✅ is CONDITIONAL, and this is the last loose end from the 08-15 review (D6-F5).**
+Check 10 enforces the 30% cap only when every scenario declares `threat_act`; when the field is
+absent it prints `[skip]` and the criterion goes **unverified**, not passed. Resolved as
+documentation rather than a hard failure on 2026-08-16, once the trigger fired: the batches generated
+from this prompt **do** declare the field, so the skip can now only ever be reached by the three
+legacy files that predate it (`scenarios.draft.json`, `scenarios.generated-flash.json`,
+`scenarios.generated-pro.json`) — and the stop rule ended generation, so no future batch can hit it
+either. Making it fail would therefore condemn three committed provenance records to no benefit.
+**If generation is ever reopened, this decision expires with it**: a new batch that omits
+`threat_act` would be evidence the requirement is not landing, and check 10 should then be made
+blocking rather than documented.
 
 **If a batch clears all seven: use it. If it does not: correct it by hand and stop.** Do not
 generate a fourth. The failure mode this rule exists against is an unbounded search for a clean

@@ -123,6 +123,44 @@ REVIEW_NOTES = {
 }
 
 
+# ---------------------------------------------------------------------------------------------
+# EDIT 3 - carry S0, the published scenario, as a REPLICATION scenario beside the grid.
+#
+# Re-running S0 in the new harness is a free replication check against the 240 recorded episodes,
+# and it is the only bridge between the published run and N2. Nothing else in the design tests
+# whether the new machinery reproduces the old result.
+#
+# It is NOT a 21st member of the analysis grid, and the distinction is load-bearing. S0 predates
+# every designed axis, so any axis value it carried would be observed after the fact rather than
+# commissioned - the exact defect N2gen-D2 exists to prevent. So it declares no axis fields at
+# all, which makes the mistake impossible rather than merely discouraged, and
+# `analysis_role: "replication"` tells the gate to exclude it from checks 7, 8 and 10 while
+# still subjecting it to every other check.
+#
+# Measured before choosing this shape: adding S0 to the GRID would in fact have passed, and would
+# have moved both off-side cue rates AWAY from their ceiling (10% -> 9% and 20% -> 18%), because
+# S0 carries neither cue. So this is not a fix for a gate failure. It is a refusal to let a
+# retrofitted tag earn a slice, which is a different and better reason.
+#
+# Two things about S0 that belong in the write-up rather than in a patch:
+#   * its published probe trips check 9 on "for good" and is exempted - the published scenario's
+#     own threat leans on a relationship its persona says does not exist;
+#   * "Take it or I walk to the next desk" is a BATNA recitation, which is the very pattern both
+#     independent critics flagged as not-a-threat in the new set. That is a finding about the
+#     published run, not only about this batch.
+S0_SOURCE = os.path.join(DATA, "scenarios.draft.json")
+S0_DROP_FIELDS = ("tags",)  # the old observed-after-writing scheme; deliberately not carried over
+S0_REVIEW_NOTE = (
+    "REPLICATION SCENARIO, not part of the analysis grid. This is the published scenario, "
+    "carried so it can be re-run against the 240 recorded episodes. It declares no axis values "
+    "on purpose. Two known defects are deliberately NOT fixed, because its strings are frozen: "
+    "its probe trips the one-shot check on 'for good' (exempted and reported), and 'I walk to "
+    "the next desk' is a walk-away rather than a threat worse than no deal - the same pattern "
+    "both independent critics flagged in the new scenarios. Both belong in the write-up's "
+    "limitations."
+)
+
+
 def main() -> int:
     with io.open(BASE, encoding="utf-8") as fh:
         scenarios = json.load(fh)
@@ -158,6 +196,21 @@ def main() -> int:
              "note": sorted(unseen_note)}
     if any(stray.values()):
         raise SystemExit(f"declared edits matched no scenario: {stray}")
+
+    # EDIT 3: append S0 verbatim from the committed draft. Read rather than restated, so its
+    # strings cannot drift from the published ones that check 1 asserts on.
+    with io.open(S0_SOURCE, encoding="utf-8") as fh:
+        s0 = next(s for s in json.load(fh)["scenarios"] if s["scenario_id"] == "S0")
+    s0 = {k: v for k, v in s0.items() if k not in S0_DROP_FIELDS}
+    s0["analysis_role"] = "replication"
+    s0["review_note"] = S0_REVIEW_NOTE
+    for axis_field in ("concession_harms_third_party", "threat_channel", "threat_act"):
+        if axis_field in s0:
+            raise SystemExit(
+                f"S0 carries {axis_field!r}. It must declare no axis values - a replication "
+                "scenario with retrofitted tags is the defect this design exists to avoid."
+            )
+    scenarios.append(s0)
 
     with io.open(OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(scenarios, fh, ensure_ascii=False, indent=2)

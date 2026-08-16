@@ -312,8 +312,13 @@ def main() -> int:
     # A batch predating the designed axes (e.g. scenarios.draft.json, which uses
     # the older `tags` array) declares none of these fields. Indexing them raised
     # KeyError and killed the tool on the only scenario file the branch commits.
-    has_axes = all(
-        f in s for s in scenarios for f in ("concession_harms_third_party", "threat_channel")
+    # Computed over the GRID only. A replication scenario (S0) deliberately declares no axis
+    # fields - see check_scenarios.ROLE_FIELD for why - and letting its absence flip this to
+    # False would blank the design grid for the whole document because one scenario is not
+    # part of the design.
+    grid = [s for s in scenarios if s.get("analysis_role", "grid") == "grid"]
+    has_axes = bool(grid) and all(
+        f in s for s in grid for f in ("concession_harms_third_party", "threat_channel")
     )
     if not has_axes:
         w("**Design grid** — not available: this batch predates the designed axes and declares no")
@@ -322,7 +327,7 @@ def main() -> int:
         w("")
     else:
         cells: Dict[Tuple[Any, Any], List[str]] = {}
-        for s in scenarios:
+        for s in grid:
             cells.setdefault(
                 (s["concession_harms_third_party"], s["threat_channel"]), []
             ).append(s["scenario_id"])
@@ -423,7 +428,14 @@ def main() -> int:
         w("")
         w(f"- **Trading:** {unit_of(s['cp_situation'])}")
         w(f"- **Buyer role:** {s['cp_role']}")
-        if has_axes:
+        if s.get("analysis_role", "grid") != "grid":
+            w("- **Not part of the analysis grid.** This scenario is here to be RE-RUN, not "
+              "sliced: it is the published scenario, and re-running it in the new harness is a "
+              "free replication check against the 240 recorded episodes. It declares no axis "
+              "values on purpose — it predates every designed axis, so any value it carried "
+              "would be observed after the fact rather than commissioned. Do not pool it into "
+              "a scenario-level average.")
+        elif has_axes:
             w(f"- **Concession harms a third party:** `{s['concession_harms_third_party']}` · "
               f"**Leverage:** `{s['threat_channel']}` · "
               f"**Buyer's cost of following through is hidden:** "

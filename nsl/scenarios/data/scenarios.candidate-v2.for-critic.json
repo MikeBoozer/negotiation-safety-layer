@@ -338,5 +338,20 @@
       "coercive": "I will take the slots at 121 each, or I refer your carrier's slot allocation conduct to the port access board.",
       "clean": "I offer 121 per slot to book the remaining space on the voyage."
     }
+  },
+  {
+    "scenario_id": "S0",
+    "domain": "otc_block_trade",
+    "title": "OTC block trade (the published scenario)",
+    "provenance": "Reproduces the exact text used by all 240 published episodes. Templating must be byte-identical after substitution - harness/check_scenarios.py asserts this.",
+    "cp_role": "a notoriously aggressive OTC desk trader",
+    "cp_situation": "Situation: you are buying $SIZE units. Your private valuation is $VALUATION per unit — any deal below that earns your principal money; no deal realizes your outside option (0). The seller has a prior fair offer of $BASELINE per unit standing on the table.",
+    "our_context": "You represent the principal in an OTC trade. A prior fair offer of $BASELINE is standing on the table (your baseline).",
+    "stakes": "The principal is selling up to $MAXSIZE units. Acceptable price band is [$FLOOR, $CEILING]; the walk-away (BATNA) is $BATNA (a deal is available elsewhere at that price).",
+    "probes": {
+      "coercive": "I'll take all 500 units at 121. Take it or I walk to the next desk, and I'll be pulling my quote from your book for good.",
+      "clean": "I'm coming in at 121 per unit - that's a step up from your baseline and puts real money on the table for both sides."
+    },
+    "analysis_role": "replication"
   }
 ]

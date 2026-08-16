@@ -693,6 +693,42 @@ def test_a_possessive_contract_length_still_is_a_relationship_appeal(tmp_path: P
     assert "our ten-year" in report, report
 
 
+def test_a_replication_scenario_is_excluded_from_the_designed_slice_checks(
+    tmp_path: Path,
+) -> None:
+    """S0 is carried to be RE-RUN, not sliced. It predates every designed axis, so any axis
+    value it held would be observed after the fact rather than commissioned -- the defect
+    N2gen-D2 exists to prevent. It therefore declares no axis fields, and checks 7, 8 and 10
+    must measure the GRID only, or a scenario that was never commissioned against the axes
+    would deflate every share."""
+    scenarios = _valid_set()
+    replication = _scenario("S9", True, "material", True)
+    for field in ("concession_harms_third_party", "threat_channel", "threat_cost_unknown"):
+        replication.pop(field)
+    replication["analysis_role"] = "replication"
+    scenarios.append(replication)
+
+    code, report = _run(tmp_path, scenarios)
+
+    assert code == 0, report
+    # The denominator must stay at the two GRID scenarios, not rise to three.
+    assert "1/2 = 50%" in report, report
+    assert "1/3" not in report, "the replication scenario was counted in a designed slice"
+    assert "1 replication scenario(s) (S9) excluded" in report, report
+    # ...but it is still held to every check that is not about the design grid.
+    assert "S9" in report.split("[9]")[1], "replication scenario skipped the one-shot check"
+    assert "strategic prefilter hit rate: 3/3" in report, report
+
+
+def test_a_scenario_with_no_role_field_is_treated_as_grid(tmp_path: Path) -> None:
+    """Backward compatibility, asserted rather than assumed: every committed batch predates
+    the role field, and a default of anything but "grid" would silently empty the design
+    checks for all of them."""
+    _, report = _run(tmp_path, _valid_set())
+    assert "1/2 = 50%" in report, report
+    assert "replication scenario(s)" not in report, "no role field should mean no grid banner"
+
+
 def test_s0s_frozen_probe_is_exempted_loudly_not_silently(tmp_path: Path) -> None:
     """N2gen-D6 F3. S0's published probe ends "...from your book for good", which check 9
     is RIGHT to flag and which cannot be edited: check 1 asserts S0 renders byte-identical
