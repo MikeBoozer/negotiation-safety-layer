@@ -94,10 +94,29 @@ def test_inertness_reads_every_recorded_message_not_just_the_published_ones(
     assert expected > 240, "the pilots must be included, not only the two published runs"
 
 
-def test_inertness_passes_against_the_commit_this_fix_replaced(tmp_path: Path) -> None:
-    """The control, and the actual claim this tool exists to support: the N2gen-D6 fix to
-    the refusal-verb branches changes no label on any already-recorded message."""
-    code, report = _run_inertness(tmp_path, "52d1b52")
+# ⚠️ These use HEAD as the baseline, NOT a pinned sha, and that is deliberate.
+#
+# The first version pinned `52d1b52` -- the real commit whose inertness was being asserted.
+# It passed locally and FAILED CI on both Python versions, because `actions/checkout@v4`
+# makes a depth-1 shallow clone and that revision simply does not exist there:
+# "cannot read nsl/scenarios/markers.py at '52d1b52': git exited 128".
+#
+# The tempting fix is `fetch-depth: 0` in the workflow. That was rejected: the sha lives on
+# a FEATURE branch, so the test would still break the day that branch is deleted after
+# merge, and a test whose passing depends on unrelated branch housekeeping is a trap for
+# whoever trips it.
+#
+# What these tests owe is that the TOOL works -- that it reads the whole corpus, reports
+# zero changes when there are none, detects changes when there are, and refuses an
+# unresolvable ref. None of that needs a historical revision: HEAD-vs-working-tree is the
+# no-change case, and the mutation below supplies the change case. The one-time historical
+# claim (the N2gen-D6 fix relabels none of the 415 recorded messages, verified against both
+# 52d1b52 and 9e99ec9~1) is recorded in that commit, which is where a one-time verification
+# belongs.
+def test_inertness_reports_no_change_when_there_is_none(tmp_path: Path) -> None:
+    """The control. Against HEAD on a clean tree the marker set is its own baseline, so the
+    tool must report zero label changes across all 415 recorded messages and exit 0."""
+    code, report = _run_inertness(tmp_path, "HEAD")
     assert code == 0, report
     assert "label changes: 0" in report, report
     assert "INERT" in report
@@ -106,12 +125,13 @@ def test_inertness_passes_against_the_commit_this_fix_replaced(tmp_path: Path) -
 def test_inertness_detects_a_changed_label(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The mutation guard. A check that has only ever passed is not known to work -- and
-    this whole tool exists because a verification that always came back green was, twice,
-    a verification nobody had re-run after the code changed. A regex that fires on
+    """The mutation guard, and the half that would be missing if only the test above
+    existed. This whole tool exists because a verification that always came back green was,
+    twice, a verification nobody had re-run after the code changed -- so a tool that can
+    only report "inert" is the very failure it was built to prevent. A regex firing on
     everything must be caught."""
     monkeypatch.setattr(inert, "SHARED_COERCION_MARKERS", re.compile(r"."))
-    code, report = _run_inertness(tmp_path, "52d1b52")
+    code, report = _run_inertness(tmp_path, "HEAD")
     assert code == 1, report
     assert "FAILURES:" in report
     assert "already-recorded messages" in report
