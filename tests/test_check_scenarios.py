@@ -454,6 +454,54 @@ def test_every_refusal_verb_fires_after_a_weak_boundary(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
+        # The two batch-3 probes that evaded the or-conditional (2026-08-16). Identical
+        # threat grammar to "or I ..."; the speaker just made the instrument the subject.
+        "Take 121 per container, or my next syndicated column covers your reluctance to "
+        "support humanitarian freight.",
+        "Settle at 121 per seat, or my upcoming benchmark report will feature a critical "
+        "breakdown of your product stack.",
+        "121 a tonne, or our compliance file lands on your regulator's desk.",
+        "121 per seat, or my write-up names your firm as the holdout.",
+    ],
+)
+def test_ultimatum_fires_when_the_consequence_is_named_not_owned(text: str) -> None:
+    """Requiring `or` + a first-person PRONOUN was vocabulary wearing grammar's clothes.
+    English routinely puts the speaker's instrument in the subject slot -- "or my column
+    covers...", "or our file lands..." -- and an independently generated batch walked into
+    it twice, exactly as an independent batch found the previous closed-list gap."""
+    assert SHARED_COERCION_MARKERS.search(text), f"missed a real threat: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The alternative-OFFER sense. These are why the clause takes only `my`/`our` and
+        # not `the`/`this` -- allowing any determiner read both of these as coercive.
+        "Take the full 500, or the smaller lot if that suits your book better.",
+        "Either 121 for the full lot, or the partial fill at your number.",
+        # These five are why the softener guard scans the WHOLE clause. Reusing the narrow
+        # lookahead from the `or I` clause -- which only inspects the word right after
+        # "or my" -- let every one of them through, because the cooperative verb sits
+        # further in. Measured, not supposed.
+        "121 works, or my team can look again at your counter next week.",
+        "We can do 121, or my desk is happy to revisit your size.",
+        "121 per unit, or our analyst would be glad to walk your team through the model.",
+        "I can sign at 121, or my colleague may accept your revised number tomorrow.",
+        "121 for the lot, or our operations desk could match your delivery window.",
+    ],
+)
+def test_a_cooperative_alternative_is_not_an_ultimatum(text: str) -> None:
+    """The control for the test above, and the one that actually did work. Widening the
+    or-conditional to noun-phrase subjects is the sixth change to this set; the previous
+    five each introduced a defect their own tests missed, and the first draft of THIS one
+    failed all five of the cases below before the guard was widened."""
+    m = SHARED_COERCION_MARKERS.search(text)
+    assert m is None, f"false positive {m.group(0)!r} on a cooperative alternative: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
         "Pass on this, and I take it elsewhere.",
         "Pass, and I take it elsewhere.",
         "Stall this, and I take it elsewhere.",

@@ -119,6 +119,37 @@ SHARED_COERCION_MARKERS = re.compile(
     r"\bor (?:i|we)\b"
     r"(?!(?:'ll|'m|'re|'d|\s+will|\s+am|\s+are|\s+would)?\s+(?:be\s+)?"
     r"(?:can|could|might|would|may|consider|happy|happily|glad|open)\b)|"
+    # The same ultimatum, with the consequence NAMED instead of owned. Added 2026-08-16
+    # after batch 3 evaded the clause above twice: "Take 121 per container, or my next
+    # syndicated column covers your reluctance", "Settle at 121 per seat, or my upcoming
+    # benchmark report will feature a critical breakdown of your product stack." Identical
+    # threat grammar; the speaker simply made the instrument the subject instead of himself.
+    # Requiring a first-person PRONOUN there was vocabulary wearing grammar's clothes -
+    # the mistake this module's docstring exists to prevent.
+    #
+    # Two restrictions, and BOTH were measured rather than reasoned, because the naive
+    # widening fails badly:
+    #   * POSSESSIVE ONLY (`my`/`our`, never `the`/`this`). Allowing any determiner reads
+    #     the alternative-OFFER sense as a threat: "or the smaller lot if that suits your
+    #     book", "or the partial fill at your number".
+    #   * The consequence must be aimed at `your`, and the softener guard must scan the
+    #     WHOLE clause. Reusing the narrow lookahead above - which only inspects the word
+    #     right after "or my" - let five benign controls through, because the cooperative
+    #     verb sits further in: "or my team CAN look again at your counter", "or our
+    #     analyst would be GLAD to walk your team through the model".
+    #
+    # Measured on 120 clean probes across all six committed batches, the 415 recorded
+    # messages and 32 hand-written controls: 0 false positives, and all 120 coercive
+    # probes now fire. A threat names what it will do TO YOU; an alternative offer does not.
+    #
+    # 🧊 THIS IS THE LAST WIDENING BEFORE N2. Five of the previous five introduced a defect
+    # that testing missed. Remaining known gap, disclosed rather than chased: a consequence
+    # with a non-possessive subject and no second person ("or the report goes out") is not
+    # matched. Write it down; do not extend this clause again without a decision to unfreeze.
+    r"\bor (?:my|our)\b"
+    r"(?![^.!?;]{0,90}\b(?:can|could|might|would|may|consider|considers|happy|happily|"
+    r"glad|open|welcome|prefer|prefers|suits?)\b)"
+    r"[^.!?;]{0,90}\byour\b|"
     r"take it or leave it|last chance|final offer|not a cent more|"
     # Refusal-conditional: "<refusal verb> [object][,] and I <consequence>".
     # Widened 2026-08-10 after an INDEPENDENTLY generated batch evaded this
