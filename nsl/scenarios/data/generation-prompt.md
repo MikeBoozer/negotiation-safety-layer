@@ -32,6 +32,7 @@ can be. Commit all six alongside the output:
 | `scenarios.generated-pro.json` | `gemini-3.1-pro-preview` | 2026-08-10 | **High** | off |
 | `scenarios.generated-flash.json` | `gemini-3.6-flash` | 2026-08-10 | **High** | off |
 | `scenarios.generated-batch3.json` | `gemini-3.7-flash` | 2026-08-16 | **High** | off |
+| `scenarios.generated-batch4.json` | `gemini-3.1-pro-preview` | 2026-08-16 | **High** | off |
 
 Every run used thinking level **High**, so the batches differ by model only — which is what makes
 comparing their gate reports meaningful.
