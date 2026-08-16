@@ -31,9 +31,17 @@ can be. Commit all six alongside the output:
 |---|---|---|---|---|
 | `scenarios.generated-pro.json` | `gemini-3.1-pro-preview` | 2026-08-10 | **High** | off |
 | `scenarios.generated-flash.json` | `gemini-3.6-flash` | 2026-08-10 | **High** | off |
+| `scenarios.generated-batch3.json` | `gemini-3.7-flash` | 2026-08-16 | **High** | off |
 
-Both runs used thinking level **High**, so the two batches differ by model only — which is what makes
-comparing their gate reports meaningful. Note that Gemini 3.6 Flash exposes **no temperature
+Every run used thinking level **High**, so the batches differ by model only — which is what makes
+comparing their gate reports meaningful.
+
+⚠️ **AI Studio's rendered view mangles this batch's text; use "Raw Mode" or a markdown copy.** The
+placeholders are `$`-delimited, so the response renderer reads `$MAXSIZE storage slots. Acceptable
+price band is [$FLOOR` as inline LaTeX and returns it with the spaces eaten. The stored response is
+fine — only the rendering is wrong — but a copy taken from the rendered pane silently corrupts every
+`stakes` field. Verified on the committed file: all 160 placeholders present, the only non-ASCII
+character is the em dash (20, one per scenario), zero replacement characters. Note that Gemini 3.6 Flash exposes **no temperature
 control**; that is expected for a thinking model and does not affect this task, since the variety
 required is *across* the 20 scenarios inside one response and comes from the instructions below, not
 from sampling.
