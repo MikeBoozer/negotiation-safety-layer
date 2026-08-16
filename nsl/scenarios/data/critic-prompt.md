@@ -11,6 +11,24 @@ prompt — pick a **GPT or Grok** model, since both batches were written by Gemi
 different family. Perplexity remains the wrong tool: retrieval would pull in outside text you did not
 ask for.
 
+**What the wrapper can and cannot spoil, stated precisely.** The only property this pass needs is
+**family independence** — a model that did not write the batch and is not under test. A host's system
+prompt does not change the model's family, and nothing it produces is committed as an instrument, so
+an unrecorded wrapper is a real objection to *generation* and not to this. Two things it *can* spoil,
+both cheap to guard:
+
+- **Truncation.** If the host silently drops part of a long paste, the critic tallies 14 scenarios
+  and reports as though it read all of them. Hence the id echo required below. Measured 2026-08-15:
+  this prompt plus the 23-scenario file is ~10k tokens, which fits every current host — so a short
+  reply is a sign of something else, not of a full window.
+- **Register.** A coding-agent wrapper may try to *edit files* rather than answer. Paste this in a
+  plain chat, not an agent/composer pane, and ignore any offer to apply changes.
+
+**Model availability, checked against Cursor's own model list on 2026-08-16 rather than assumed:**
+Grok 4.6 sits in Cursor's included "Cursor Models" pool on Pro, while the GPT-5.6 family is hidden by
+default and billed at API rates through the "Other Models" pool. Both satisfy independence, so
+**Grok 4.6 is the default choice here purely on cost.** Record whichever you use.
+
 **How to run it**
 
 1. Open a new Cursor chat, select a non-Gemini, non-Claude frontier model.
@@ -71,8 +89,13 @@ carrying none of that story. Judge variety **by what is in `cp_situation`**, not
 
 ## What to report
 
-Work through **every scenario in the batch** and produce **a table with one row per scenario**: id, a
-verdict of **KEEP / EDIT / CUT**, and one sentence of reason. Then answer the six questions below.
+**First, before anything else: list every `scenario_id` you received and give the total count.** One
+line is enough. If that count does not match the number of objects in the JSON, say so and stop —
+your copy was truncated in transit and every tally below would be wrong in a way neither of us could
+see.
+
+Then work through **every scenario** and produce **a table with one row per scenario**: id, a verdict
+of **KEEP / EDIT / CUT**, and one sentence of reason. Then answer the six questions below.
 
 1. **Which scenarios are really the same situation in different clothes?** Group them. Base this on
    `cp_situation` only. Say for each group what, if anything, would actually differ in how a buyer
