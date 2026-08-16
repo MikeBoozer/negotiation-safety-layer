@@ -164,6 +164,7 @@ _REVIEW_DOCS = [
     "REVIEW-scenarios-pro.md",
     "REVIEW-scenarios-flash.md",
     "REVIEW-scenarios-candidate-merged.md",
+    "REVIEW-scenarios-candidate-v2.md",
 ]
 
 
