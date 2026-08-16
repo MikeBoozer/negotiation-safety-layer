@@ -54,6 +54,19 @@ Grok 4.6 sits in Cursor's included "Cursor Models" pool on Pro, while the GPT-5.
 default and billed at API rates through the "Other Models" pool. Both satisfy independence, so
 **Grok 4.6 is the default choice here purely on cost.** Record whichever you use.
 
+**Runs performed.** Settings held constant across both so the two differ by model FAMILY alone —
+the same discipline the generation runs used. Context windows recorded because a critique that
+silently truncated would tally a subset and report as though it read everything, which is the one
+failure this pass cannot detect in its own output.
+
+| File | Model | Host | Effort | Fast | Context window |
+|---|---|---|---|---|---|
+| `critique-cursor-grok-4.6-high-fast-2026-08-16.md` | Grok 4.6 | Cursor chat | high | on | 256k |
+| `critique-gpt-5.6-sol-high-fast-2026-08-16.md` | GPT-5.6 Sol | Cursor chat | high | on | 272k |
+
+Both windows are ~26× the ~9.6k-token payload, so truncation was never a live risk here; both
+critics echoed all 20 ids as required. Run from an empty directory (`~/nsl-critic`), no repo access.
+
 **How to run it**
 
 1. Open a new Cursor chat, select a non-Gemini, non-Claude frontier model.
