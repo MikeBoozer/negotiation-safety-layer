@@ -30,7 +30,14 @@ sequencing changed:**
   the comparison class buys its generalization. And 5 is below the usable floor: a distribution-free
   scenario-level test cannot reach p < 0.05 at S=5 (smallest two-sided sign-test p is 2/2⁵ = 0.0625),
   and between-cell tests run at 2–3× their nominal error rate when the effect is scenario-specific.
-  **Design S=10–20 situations × R=3–4.** See [`writeup.md`](writeup.md) §6.
+  **Design S≥20 situations × R=3–4** — and note **S=10–20 is a FLOOR, not a target** (corrected
+  2026-08-16). Scenario count is the dominant lever for a generalizing claim: the standard error of
+  the scenario-averaged effect goes as √(τ²/S + σ²/SR), so **S reduces both terms while R reduces
+  only the second**, and with effects this large the between-scenario term dominates. Adding
+  repetitions is close to wasted; adding situations is not. Reach for 30–40 where the material
+  exists, and never trim the set to hit a count — for the marginal estimand the scenario set *is*
+  the population being averaged over, so cutting it redefines the quantity reported. See
+  [`writeup.md`](writeup.md) §6.
   The audit also found the write-up's H2 contrast is null (p=0.49) and the bilateral mechanism split
   unresolved (p=0.089) — so "resolve the cheap-talk arm" is no longer the goal that justifies a run.
 - **Do first (new, cheap, unblocks everything).** The two parked hardening extensions from
