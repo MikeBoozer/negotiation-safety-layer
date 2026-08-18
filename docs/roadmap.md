@@ -31,7 +31,8 @@ sequencing changed:**
   only distinct narrative situations do, which is how the comparison class buys its generalization.
   **Never trim the set to hit a count:** the scenario set is the population the reported effect is
   averaged over, so cutting it redefines the quantity reported rather than shrinking the sample.
-  See [`writeup.md`](writeup.md) §6; the power analysis lands with the N2 pre-registration.
+  See [`writeup.md`](writeup.md) §6; the power analysis lands with the pre-registration for that
+  run (referred to throughout this repo as **N2**, the hardening re-run described in this bullet).
   The audit also found the write-up's H2 contrast is null (p=0.49) and the bilateral mechanism split
   unresolved (p=0.089) — so "resolve the cheap-talk arm" is no longer the goal that justifies a run.
 - **Do first (new, cheap, unblocks everything).** The two parked hardening extensions from
@@ -64,7 +65,10 @@ sequencing changed:**
   Oesterheld, AAAI'26) + shipped commitment rails (AP2 mandates, x402, TEE-attested inference).
   Effort: moderate; pure adapter work, core untouched.
 
-- **R2. Policy-card / mutual-transparency mode.** Publish the deterministic verifier rules (R1/R2/R4)
+- **R2. Policy-card / mutual-transparency mode.** Publish the deterministic **verifier rules**
+  (the verifier's own rule numbering — its no-reward-for-coercion and no-retaliation clauses are
+  described in [`writeup.md`](writeup.md) §2; that numbering is unrelated to the R-items on this
+  page, which are build steps)
   and mandate bounds as a machine-readable "policy card" during the SPI handshake; accept and
   *evaluate* the counterparty's card, conditioning concessions on reciprocal legibility (the
   default-conditional commitment type). Turns NSL from unilaterally-safe into *cooperatively*
