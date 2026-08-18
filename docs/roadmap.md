@@ -24,20 +24,14 @@ sequencing changed:**
   [`EXPERIMENT-STANDARDS.md`](EXPERIMENT-STANDARDS.md) — doubling *items* is the largest available
   variance reduction, and repetitions are not items). The revised first move is **breadth**: the three
   unilateral cells re-run across a scenario grid × 2–3 model families, at roughly the same cost.
-  **Refined 2026-07-31 — the "~5 scenario instances" this bullet used to specify is wrong twice
-  over.** An *instance* meant a numeric draw (valuation / baseline / size), and numeric draws do not
-  retire the single-scenario limitation at all; only distinct narrative *situations* do, which is how
-  the comparison class buys its generalization. And 5 is below the usable floor: a distribution-free
-  scenario-level test cannot reach p < 0.05 at S=5 (smallest two-sided sign-test p is 2/2⁵ = 0.0625),
-  and between-cell tests run at 2–3× their nominal error rate when the effect is scenario-specific.
-  **Design S≥20 situations × R=3–4** — and note **S=10–20 is a FLOOR, not a target** (corrected
-  2026-08-16). Scenario count is the dominant lever for a generalizing claim: the standard error of
-  the scenario-averaged effect goes as √(τ²/S + σ²/SR), so **S reduces both terms while R reduces
-  only the second**, and with effects this large the between-scenario term dominates. Adding
-  repetitions is close to wasted; adding situations is not. Reach for 30–40 where the material
-  exists, and never trim the set to hit a count — for the marginal estimand the scenario set *is*
-  the population being averaged over, so cutting it redefines the quantity reported. See
-  [`writeup.md`](writeup.md) §6.
+  **Design S≥20 distinct situations × R=3–4 repetitions, and reach for 30–40 where the material
+  exists.** Situations are the lever, not repetitions: both raise precision, but only more
+  situations reduces the between-scenario variance term, and that term dominates at these effect
+  sizes. A handful of numeric draws on one scenario does not retire the single-scenario limitation —
+  only distinct narrative situations do, which is how the comparison class buys its generalization.
+  **Never trim the set to hit a count:** the scenario set is the population the reported effect is
+  averaged over, so cutting it redefines the quantity reported rather than shrinking the sample.
+  See [`writeup.md`](writeup.md) §6; the power analysis lands with the N2 pre-registration.
   The audit also found the write-up's H2 contrast is null (p=0.49) and the bilateral mechanism split
   unresolved (p=0.089) — so "resolve the cheap-talk arm" is no longer the goal that justifies a run.
 - **Do first (new, cheap, unblocks everything).** The two parked hardening extensions from
