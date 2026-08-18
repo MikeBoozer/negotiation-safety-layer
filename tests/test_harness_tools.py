@@ -327,6 +327,19 @@ def test_inertness_names_every_marker_set_it_compared(tmp_path: Path) -> None:
         assert name in report, f"{name} must be named in the report"
 
 
+# `build_candidate_v2.py` and the raw batch it builds from are the in-flux candidate-set
+# material, which is deliberately absent from the apparatus branch (and from any tree that
+# carries the finished harness without the scenario redesign). Skip on absence rather than
+# hard-import, matching the review-doc test above: one test file has to pass on both trees,
+# and a hand-maintained "which branch am I on" list is exactly the drift that guard avoids.
+_BUILDER = REPO / "harness" / "build_candidate_v2.py"
+_BUILDER_BASE = REPO / "nsl" / "scenarios" / "data" / "scenarios.generated-batch3.json"
+_builder_inputs_present = pytest.mark.skipif(
+    not (_BUILDER.exists() and _BUILDER_BASE.exists()),
+    reason="build_candidate_v2.py or its base batch is not in this tree",
+)
+
+
 def _run_builder(tmp_path: Path, base: object, draft: object) -> tuple[int, str]:
     """Run build_candidate_v2.main() against substituted inputs."""
     from harness import build_candidate_v2 as builder
@@ -358,6 +371,7 @@ def _real_draft() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+@_builder_inputs_present
 def test_builder_refuses_a_base_batch_whose_probe_has_changed(tmp_path: Path) -> None:
     """Finding 6. Clause rewrites asserted the old text before replacing it; PROBE rewrites
     assigned by id alone. The rewritten probes carry invented commercial facts true of one
@@ -374,6 +388,7 @@ def test_builder_refuses_a_base_batch_whose_probe_has_changed(tmp_path: Path) ->
     assert "not the one this edit was written against" in msg, msg
 
 
+@_builder_inputs_present
 def test_builder_gives_a_sentence_not_a_traceback_when_s0_is_missing(tmp_path: Path) -> None:
     """Finding 7. Every other failure path in the script exits with an explanation; this one
     raised StopIteration from a bare generator expression."""
@@ -386,6 +401,7 @@ def test_builder_gives_a_sentence_not_a_traceback_when_s0_is_missing(tmp_path: P
     assert "no scenario with id 'S0'" in msg, msg
 
 
+@_builder_inputs_present
 def test_builder_still_succeeds_on_the_committed_inputs(tmp_path: Path) -> None:
     """The control, so the two tests above cannot be passing because everything fails."""
     code, msg = _run_builder(tmp_path, _real_base(), _real_draft())
