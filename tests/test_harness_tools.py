@@ -295,3 +295,134 @@ def test_trigger_phrase_tally_strips_the_sentence_anchor(tmp_path: Path) -> None
         if ln.startswith("- Trigger phrase matched: `") and re.search(r"`[.!?;:,\-–— ]", ln)
     ]
     assert not offenders, offenders[:3]
+
+
+# ---------------------------------------------------------------------------------------
+# 2026-08-17 code review, findings 5-7.
+# ---------------------------------------------------------------------------------------
+
+
+def test_inertness_also_guards_the_strategic_prefilter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finding 5. The tool compared only SHARED_COERCION_MARKERS while its name, docstring
+    and every reference to it said "the shared marker set". check 2 of the gate calls
+    SHARED_STRATEGIC_MARKERS "the string that decides whether the LLM call happens", so an
+    edit to the prefilter passed here vacuously -- printing `label changes: 0` and `INERT`
+    for a check that never ran. That is the same always-green shape this whole module was
+    written to end, one level up."""
+    monkeypatch.setattr(inert, "SHARED_STRATEGIC_MARKERS", re.compile(r"zzzz-never-matches"))
+    code, report = _run_inertness(tmp_path, "HEAD")
+    assert code == 1, report
+    assert "SHARED_STRATEGIC_MARKERS" in report, report
+    assert "LOST" in report, "a strategic-set change must be shown, not just counted"
+
+
+def test_inertness_names_every_marker_set_it_compared(tmp_path: Path) -> None:
+    """The control for the test above. A report that does not say WHICH sets it covered
+    cannot be read as evidence about the one you changed."""
+    code, report = _run_inertness(tmp_path, "HEAD")
+    assert code == 0, report
+    for name in inert.MARKER_SET_NAMES:
+        assert name in report, f"{name} must be named in the report"
+
+
+# `build_candidate_v2.py` and the raw batch it builds from are the in-flux candidate-set
+# material, which is deliberately absent from the apparatus branch (and from any tree that
+# carries the finished harness without the scenario redesign). Skip on absence rather than
+# hard-import, matching the review-doc test above: one test file has to pass on both trees,
+# and a hand-maintained "which branch am I on" list is exactly the drift that guard avoids.
+_BUILDER = REPO / "harness" / "build_candidate_v2.py"
+_BUILDER_BASE = REPO / "nsl" / "scenarios" / "data" / "scenarios.generated-batch3.json"
+_builder_inputs_present = pytest.mark.skipif(
+    not (_BUILDER.exists() and _BUILDER_BASE.exists()),
+    reason="build_candidate_v2.py or its base batch is not in this tree",
+)
+
+
+def _run_builder(tmp_path: Path, base: object, draft: object) -> tuple[int, str]:
+    """Run build_candidate_v2.main() against substituted inputs."""
+    from harness import build_candidate_v2 as builder
+
+    base_p, draft_p = tmp_path / "base.json", tmp_path / "draft.json"
+    base_p.write_text(json.dumps(base), encoding="utf-8")
+    draft_p.write_text(json.dumps(draft), encoding="utf-8")
+
+    saved = (builder.BASE, builder.S0_SOURCE, builder.OUT, builder.OUT_CRITIC)
+    builder.BASE, builder.S0_SOURCE = str(base_p), str(draft_p)
+    builder.OUT = str(tmp_path / "out.json")
+    builder.OUT_CRITIC = str(tmp_path / "out-critic.json")
+    try:
+        builder.main()
+        return 0, ""
+    except SystemExit as exc:
+        return 1, str(exc)
+    finally:
+        builder.BASE, builder.S0_SOURCE, builder.OUT, builder.OUT_CRITIC = saved
+
+
+def _real_base() -> list:
+    path = REPO / "nsl" / "scenarios" / "data" / "scenarios.generated-batch3.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _real_draft() -> dict:
+    path = REPO / "nsl" / "scenarios" / "data" / "scenarios.draft.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@_builder_inputs_present
+def test_builder_refuses_a_base_batch_whose_probe_has_changed(tmp_path: Path) -> None:
+    """Finding 6. Clause rewrites asserted the old text before replacing it; PROBE rewrites
+    assigned by id alone. The rewritten probes carry invented commercial facts true of one
+    scenario ("the railhead switch"), so against a regenerated or reordered batch, matching
+    by id would staple T1's railhead threat onto whatever now trades as T1 -- silently, and
+    under a commit message saying the set had been repaired."""
+    base = _real_base()
+    base[0]["probes"]["coercive"] = "Some entirely different offer at 121 per slot."
+
+    code, msg = _run_builder(tmp_path, base, _real_draft())
+
+    assert code == 1, "a changed base probe must stop the build"
+    assert base[0]["scenario_id"] in msg, msg
+    assert "not the one this edit was written against" in msg, msg
+
+
+@_builder_inputs_present
+def test_builder_gives_a_sentence_not_a_traceback_when_s0_is_missing(tmp_path: Path) -> None:
+    """Finding 7. Every other failure path in the script exits with an explanation; this one
+    raised StopIteration from a bare generator expression."""
+    draft = _real_draft()
+    draft["scenarios"] = [s for s in draft["scenarios"] if s["scenario_id"] != "S0"]
+
+    code, msg = _run_builder(tmp_path, _real_base(), draft)
+
+    assert code == 1, "a draft without S0 must stop the build"
+    assert "no scenario with id 'S0'" in msg, msg
+
+
+@_builder_inputs_present
+def test_builder_still_succeeds_on_the_committed_inputs(tmp_path: Path) -> None:
+    """The control, so the two tests above cannot be passing because everything fails."""
+    code, msg = _run_builder(tmp_path, _real_base(), _real_draft())
+    assert code == 0, msg
+
+
+def test_marker_validation_fails_on_an_empty_corpus(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pass-2 review, 2026-08-18. Both result files existing but EMPTY reached the rate
+    computation with n = 0, where `fmt()` divides by n -- so the tool died with
+    ZeroDivisionError and wrote no report. Zero rows is a failure, not a crash: an absent
+    report reads as "nothing disagreed", which is the always-green shape the sibling tools
+    (`check_marker_inertness.py`, `check_scenarios.py`, `make_review_doc.py`) all guard."""
+    empty_a, empty_b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    empty_a.write_text("", encoding="utf-8")
+    empty_b.write_text("\n  \n", encoding="utf-8")
+    monkeypatch.setattr(cmvr, "RESULTS", [empty_a, empty_b])
+
+    code, report = _run_cmvr(tmp_path)
+
+    assert code == 1, report
+    assert "FAILURES:" in report, report
+    assert "nothing was compared" in report, report

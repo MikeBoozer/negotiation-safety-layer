@@ -30,6 +30,12 @@ sys.path.insert(0, str(REPO))
 
 from nsl.scenarios.markers import SHARED_COERCION_MARKERS  # noqa: E402
 
+# Finding 8: these were re-typed as bare literals here, so the review document and the
+# gate could drift on what "grid" means. Import the definitions instead - there is one
+# owner of the role vocabulary and it is check_scenarios.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_scenarios import GRID, PUBLISHED_FROZEN_IDS, role_of  # noqa: E402
+
 # Words present in every scenario because the template puts them there. Removing
 # them before comparing is what makes the similarity number mean "these two
 # stories are alike" rather than "these two used the same template".
@@ -316,7 +322,11 @@ def main() -> int:
     # fields - see check_scenarios.ROLE_FIELD for why - and letting its absence flip this to
     # False would blank the design grid for the whole document because one scenario is not
     # part of the design.
-    grid = [s for s in scenarios if s.get("analysis_role", "grid") == "grid"]
+    # Uses role_of/GRID rather than restating the literals. The 2026-08-17 pass converted
+    # the other call site (below) and left this one, which is the same drift the conversion
+    # was meant to end: two definitions of "grid" in one file, and the one that silently
+    # blanks the design grid is this one.
+    grid = [s for s in scenarios if role_of(s) == GRID]
     has_axes = bool(grid) and all(
         f in s for s in grid for f in ("concession_harms_third_party", "threat_channel")
     )
@@ -428,13 +438,20 @@ def main() -> int:
         w("")
         w(f"- **Trading:** {unit_of(s['cp_situation'])}")
         w(f"- **Buyer role:** {s['cp_role']}")
-        if s.get("analysis_role", "grid") != "grid":
+        if role_of(s) != GRID:
+            # The published-scenario sentence is TRUE OF S0 ONLY. Printed for every
+            # non-grid scenario, it would tell a critic that some future replication
+            # scenario is "the published scenario" with "240 recorded episodes" behind
+            # it - a false claim in the document handed to independent reviewers, which
+            # is the one place this repo can least afford one.
             w("- **Not part of the analysis grid.** This scenario is here to be RE-RUN, not "
-              "sliced: it is the published scenario, and re-running it in the new harness is a "
-              "free replication check against the 240 recorded episodes. It declares no axis "
-              "values on purpose — it predates every designed axis, so any value it carried "
-              "would be observed after the fact rather than commissioned. Do not pool it into "
-              "a scenario-level average.")
+              "sliced. It declares no axis values on purpose — it predates every designed "
+              "axis, so any value it carried would be observed after the fact rather than "
+              "commissioned. Do not pool it into a scenario-level average.")
+            if sid in PUBLISHED_FROZEN_IDS:
+                w(f"- **`{sid}` is the published scenario.** Re-running it in the new harness "
+                  "is a free replication check against the 240 recorded episodes, and it is "
+                  "the sole bridge between the published run and N2.")
         elif has_axes:
             w(f"- **Concession harms a third party:** `{s['concession_harms_third_party']}` · "
               f"**Leverage:** `{s['threat_channel']}` · "
