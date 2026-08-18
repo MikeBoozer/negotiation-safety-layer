@@ -74,6 +74,21 @@ def main() -> int:
         with path.open(encoding="utf-8") as fh:
             rows.extend(json.loads(line) for line in fh if line.strip())
 
+    if not rows:
+        # Both files existing but empty (or blank-line-only) reaches here with n = 0, and
+        # `fmt()` divides by n - so the tool died with ZeroDivisionError and wrote no report
+        # at all. Zero rows must be a FAILURE, not a crash and not a silent pass: an empty
+        # report reads as "nothing disagreed", which is the always-green shape every other
+        # tool here guards against. Same guard as check_marker_inertness.py.
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            "shared marker set vs 0 recorded counterparty messages\n\n"
+            "FAILURES:\n  - no recorded messages found - nothing was compared\n",
+            encoding="utf-8",
+        )
+        return 1
+
     msgs = [r["cp_message"] for r in rows]
     stored_regex = [bool(r["cp_threat_regex"]) for r in rows]
     detector = [bool(r["cp_threat_detector"]) for r in rows]

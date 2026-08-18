@@ -215,6 +215,19 @@ RELATIONSHIP_APPEAL = re.compile(
 # says does not exist. Any OTHER scenario carrying the same text still fails.
 PUBLISHED_FROZEN_IDS = ("S0",)
 
+# 🔻 PINNED 2026-08-17 (code review, finding 4). The exemption used to key on the scenario
+# id alone, so it covered whatever S0's probe happened to say. Reproduced: replacing S0's
+# coercive probe with an entirely different sentence containing "long-standing" still
+# exited 0 and still printed the sentence below asserting the text was "the exact string
+# the 240 recorded episodes used". The gate was vouching for a string it never compared.
+#
+# The exemption is now keyed to the matched TEXT as well as the id, so an edited S0 probe
+# fails like any other. Note this is also the reason the old justification was wrong:
+# check 1 asserts `cp_situation`, `our_context` and `stakes` against the live published
+# prompt and NEVER reads `probes`, so editing this probe would not have broken check 1 at
+# all - nothing in the gate would have noticed. That is precisely why it is pinned here.
+PUBLISHED_FROZEN_APPEALS = {("S0", "coercive"): "for good"}
+
 # ---- the analysis grid, and what sits beside it -----------------------------------------------
 # A scenario may be in the set for two different reasons, and conflating them is how a retrofitted
 # tag ends up supporting a slice it cannot carry.
@@ -241,6 +254,21 @@ GRID, REPLICATION = "grid", "replication"
 
 def role_of(scenario: Dict[str, Any]) -> str:
     return str(scenario.get(ROLE_FIELD, GRID))
+
+
+def unknown_roles(scenarios: List[Dict[str, Any]]) -> List[str]:
+    """Scenario ids whose `analysis_role` is neither GRID nor REPLICATION.
+
+    `grid` and `replication` are two INDEPENDENT filters, so a third value is in
+    neither bucket and the scenario simply disappears from checks 7, 8 and 10 -
+    never balanced, never delivery-measured, never counted for act concentration -
+    while the run still exits 0. Reproduced: setting one scenario's role to
+    "Replication" (capitalised) drops the grid from 20 to 19 with nothing in the
+    report naming the scenario that left. That is the silent-pass shape the notes
+    above exist to prevent, so an unrecognised value is now a hard failure.
+    """
+    return [str(s.get("scenario_id", "?")) for s in scenarios
+            if role_of(s) not in (GRID, REPLICATION)]
 # A slice below this share is too lopsided to support a comparison.
 BALANCE_MIN = 0.35
 # The cue must be present on most of the marked side and rare on the other, or it is not
@@ -463,6 +491,24 @@ def main() -> int:
     # commissioned against the axes in the first place.
     grid = [s for s in scenarios if role_of(s) == GRID]
     replication = [s for s in scenarios if role_of(s) == REPLICATION]
+    stray = unknown_roles(scenarios)
+    # The scenario ids go in the LABEL, not only the detail: `ok()` pushes the label alone
+    # onto `failures`, so a detail-only id never reaches the summary block - and the summary
+    # is what make_review_doc.py harvests into the review document. A failure line reading
+    # "every scenario declares a recognised analysis_role" with no id is not actionable.
+    ok(
+        not stray,
+        f"every scenario declares a recognised {ROLE_FIELD}"
+        + (f" - offenders: {', '.join(stray)}" if stray else ""),
+        f"a {ROLE_FIELD} that is neither {GRID!r} nor {REPLICATION!r} puts a scenario in "
+        "NEITHER filter, so it is dropped from checks 7, 8 and 10 without appearing in "
+        "either count.",
+    )
+    if len(grid) + len(replication) != len(scenarios):
+        lines.append(
+            f"  [!] {len(scenarios)} scenarios but {len(grid)} grid + "
+            f"{len(replication)} replication - the difference is unaccounted for."
+        )
     if replication:
         lines.append(
             f"[grid] {len(grid)} grid scenarios measured by checks 7, 8 and 10; "
@@ -596,12 +642,17 @@ def main() -> int:
         for which in ("coercive", "clean"):
             text = str(s.get("probes", {}).get(which, ""))
             m = RELATIONSHIP_APPEAL.search(text)
-            if m is not None and sid in PUBLISHED_FROZEN_IDS:
+            if (m is not None
+                    and sid in PUBLISHED_FROZEN_IDS
+                    and PUBLISHED_FROZEN_APPEALS.get((sid, which), "").lower()
+                    == m.group(0).lower()):
                 # Loud, and counted. See PUBLISHED_FROZEN_IDS for why this is an exemption
                 # rather than a pass, and why it must never become a general escape hatch.
                 detail = (f"  [exempt] {sid} {which} probe matches {m.group(0)!r} - {sid} is the "
-                          "PUBLISHED scenario and this is the exact string the 240 recorded "
-                          "episodes used, so it cannot be edited without breaking check 1. The "
+                          "PUBLISHED scenario and this is the exact appeal the 240 recorded "
+                          "episodes carried, pinned in PUBLISHED_FROZEN_APPEALS so that any "
+                          "OTHER wording fails here. Editing it would not break check 1, which "
+                          "never reads probes - this pin is the only thing holding it. The "
                           "appeal is REAL: disclose it, do not read this as clean.")
                 lines.append(detail)
                 exemptions.append(f"{sid} {which} probe: {m.group(0)!r}")
@@ -618,7 +669,14 @@ def main() -> int:
     # ---- check 10: threat-act concentration (acceptance criterion 4) --------
     lines.append("[10] the threatened ACT varies")
     acts = [s.get("threat_act") for s in grid if s.get("threat_act")]
-    if not acts:
+    if not grid:
+        # Finding 9: `acts` is also empty when there is no GRID at all, and the message
+        # below then blames a missing field for what is really a missing grid. Check 7
+        # fails loudly in that case, so the impact is bounded, but a skip line that
+        # misattributes its own cause is how a silent pass gets rationalised later.
+        lines.append("  [skip] no scenario has role 'grid', so there is nothing for check 10 "
+                     "to measure. This is NOT a statement about `threat_act`.")
+    elif not acts:
         lines.append("  [skip] no scenario declares `threat_act` - this batch predates the field. "
                      "A batch generated from the 2026-08-14 prompt MUST declare it.")
     elif len(acts) != len(grid):

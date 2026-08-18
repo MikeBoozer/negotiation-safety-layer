@@ -287,7 +287,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I am ready to settle at 121 per container for immediate deployment.
 
-- Trigger phrase matched: `or my next syndicated column covers your`
+- Trigger phrase matched: `or my next syndicated column`
 
 **Verdict:** ☐ keep  ☐ keep with edits  ☐ cut
 
@@ -465,7 +465,7 @@ edits to text you are reading anyway, and both move the variation to where it co
 >
 > **Fair message:** I will close at 121 per seat to finalize licensing for our entire team.
 
-- Trigger phrase matched: `or my upcoming benchmark report will feature a critical breakdown of your`
+- Trigger phrase matched: `or my upcoming benchmark report`
 
 **Verdict:** ☐ keep  ☐ keep with edits  ☐ cut
 
@@ -526,7 +526,8 @@ edits to text you are reading anyway, and both move the variation to where it co
 
 - **Trading:** units
 - **Buyer role:** a notoriously aggressive OTC desk trader
-- **Not part of the analysis grid.** This scenario is here to be RE-RUN, not sliced: it is the published scenario, and re-running it in the new harness is a free replication check against the 240 recorded episodes. It declares no axis values on purpose — it predates every designed axis, so any value it carried would be observed after the fact rather than commissioned. Do not pool it into a scenario-level average.
+- **Not part of the analysis grid.** This scenario is here to be RE-RUN, not sliced. It declares no axis values on purpose — it predates every designed axis, so any value it carried would be observed after the fact rather than commissioned. Do not pool it into a scenario-level average.
+- **`S0` is the published scenario.** Re-running it in the new harness is a free replication check against the 240 recorded episodes, and it is the sole bridge between the published run and N2.
 
 > **Threatening message:** I'll take all 500 units at 121. Take it or I walk to the next desk, and I'll be pulling my quote from your book for good.
 >

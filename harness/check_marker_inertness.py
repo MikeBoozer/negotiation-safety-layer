@@ -44,7 +44,32 @@ from typing import List, Pattern, Tuple
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from nsl.scenarios.markers import SHARED_COERCION_MARKERS  # noqa: E402
+from nsl.scenarios.markers import (  # noqa: E402
+    SHARED_COERCION_MARKERS,
+    SHARED_STRATEGIC_MARKERS,
+)
+
+# 🔻 WIDENED 2026-08-17 (code review, finding 5). This tool checked only the coercion set
+# while its name, its docstring and every reference to it said "the shared marker set".
+# `markers.py` defines two, and check 2 of the gate documents SHARED_STRATEGIC_MARKERS as
+# "the string that decides whether the LLM call happens" - so an edit to the strategic
+# prefilter passed here vacuously, printing `label changes: 0` and `INERT`. A verification
+# that reports success for a check it never ran is the exact failure this module was
+# written to end, so both sets are now compared and both are named in the report.
+MARKER_SET_NAMES = ("SHARED_COERCION_MARKERS", "SHARED_STRATEGIC_MARKERS")
+
+
+def marker_sets() -> Tuple[Tuple[str, Pattern[str]], ...]:
+    """(name, compiled regex) for the current working tree, resolved on EVERY call.
+
+    Deliberately not a module-level tuple of the compiled objects. Binding them at
+    import time freezes whatever was imported, so `monkeypatch.setattr(inert,
+    "SHARED_COERCION_MARKERS", ...)` no longer reaches the comparison and the
+    mutation guard in tests/test_harness_tools.py silently stops guarding - a tool
+    that can only report "inert" being the exact failure this module exists to
+    prevent. Looking the names up through `globals()` keeps the patch effective.
+    """
+    return tuple((name, globals()[name]) for name in MARKER_SET_NAMES)
 
 MARKERS_REL = "nsl/scenarios/markers.py"
 # Every recorded episode file, not just the two the published claim rests on.
@@ -55,7 +80,7 @@ RESULTS_GLOB = "results/*.jsonl"
 DEFAULT_OUT = REPO / "build" / "marker-inertness.txt"
 
 
-def load_baseline(ref: str) -> Pattern[str]:
+def load_baseline(ref: str) -> Tuple[Pattern[str], ...]:
     """Compile the marker set as it stood at `ref`.
 
     Loaded from `git show` into a temp file rather than by rewriting sys.modules: the
@@ -82,7 +107,15 @@ def load_baseline(ref: str) -> Pattern[str]:
             raise SystemExit(f"could not load {MARKERS_REL} from {ref!r}")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        return module.SHARED_COERCION_MARKERS
+        missing = [n for n in MARKER_SET_NAMES if not hasattr(module, n)]
+        if missing:
+            # A marker set that did not exist at the baseline cannot be compared, and
+            # silently dropping it would restore the vacuous pass this tool exists against.
+            raise SystemExit(
+                f"{MARKERS_REL} at {ref!r} defines no {', '.join(missing)}. "
+                "Compare against a ref where every marker set exists."
+            )
+        return tuple(getattr(module, n) for n in MARKER_SET_NAMES)
 
 
 def recorded_messages() -> List[Tuple[str, int, str]]:
@@ -119,13 +152,13 @@ def main() -> int:
     ap.add_argument("--out", default=str(DEFAULT_OUT))
     args = ap.parse_args()
 
-    baseline = load_baseline(args.baseline_ref)
-    current = SHARED_COERCION_MARKERS
+    baselines = load_baseline(args.baseline_ref)
     msgs = recorded_messages()
 
     lines: List[str] = []
     lines.append(f"marker inertness - working tree vs {args.baseline_ref}")
     lines.append(f"corpus: {RESULTS_GLOB} - {len(msgs)} recorded counterparty messages")
+    lines.append(f"marker sets compared: {', '.join(MARKER_SET_NAMES)}")
     lines.append("")
 
     if not msgs:
@@ -136,22 +169,28 @@ def main() -> int:
         Path(args.out).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return 1
 
-    fires_before = sum(1 for _, _, m in msgs if baseline.search(m))
-    fires_after = sum(1 for _, _, m in msgs if current.search(m))
-    changed = compare(baseline, current, msgs)
+    changed: List[Tuple[str, int, str, bool, bool]] = []
+    for (set_name, current), baseline in zip(marker_sets(), baselines):
+        fires_before = sum(1 for _, _, m in msgs if baseline.search(m))
+        fires_after = sum(1 for _, _, m in msgs if current.search(m))
+        moved = compare(baseline, current, msgs)
+        changed.extend(moved)
 
-    lines.append(f"[rates] baseline fires : {fires_before}/{len(msgs)}")
-    lines.append(f"        current  fires : {fires_after}/{len(msgs)}")
-    lines.append("")
-    lines.append(f"label changes: {len(changed)}  (must be 0)")
-    for name, lineno, msg, was, now in changed[:20]:
-        verdict = "GAINED" if now else "LOST"
-        hit = current.search(msg) if now else baseline.search(msg)
-        lines.append(f"  - {verdict} {name}:{lineno} via {hit.group(0)!r}"
-                     if hit else f"  - {verdict} {name}:{lineno}")
-        lines.append(f"      {msg[:160].replace(chr(10), ' ')}")
-    if len(changed) > 20:
-        lines.append(f"  ... and {len(changed) - 20} more")
+        lines.append(f"[{set_name}]")
+        lines.append(f"  [rates] baseline fires : {fires_before}/{len(msgs)}")
+        lines.append(f"          current  fires : {fires_after}/{len(msgs)}")
+        lines.append(f"  label changes: {len(moved)}  (must be 0)")
+        for name, lineno, msg, was, now in moved[:20]:
+            verdict = "GAINED" if now else "LOST"
+            hit = current.search(msg) if now else baseline.search(msg)
+            lines.append(f"    - {verdict} {name}:{lineno} via {hit.group(0)!r}"
+                         if hit else f"    - {verdict} {name}:{lineno}")
+            lines.append(f"        {msg[:160].replace(chr(10), ' ')}")
+        if len(moved) > 20:
+            lines.append(f"    ... and {len(moved) - 20} more")
+        lines.append("")
+
+    lines.append(f"label changes across all marker sets: {len(changed)}  (must be 0)")
 
     lines.append("")
     if changed:

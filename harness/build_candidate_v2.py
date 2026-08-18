@@ -54,6 +54,77 @@ OUT_CRITIC = os.path.join(DATA, "scenarios.candidate-v2.for-critic.json")
 # the probes now exercise the refusal-conditional branch (both boundary strengths), the
 # `unless you` connective and the `if you <refuse>` connective, rather than `or I` twenty times.
 # ---------------------------------------------------------------------------------------------
+# The probe each rewrite below expects to find in the base batch. Generated from
+# `scenarios.generated-batch3.json` rather than hand-typed, and asserted before every
+# rewrite - see the note in main(). Without it, a regenerated or reordered base batch
+# would receive edits keyed only by id, stapling one scenario's invented commercial
+# facts onto whatever now happens to carry that id.
+OLD_COERCIVE = {
+    'T1': (
+        'I will close at 121 per slot, or I keep the railhead switch locked and your grain '
+        'stays stranded on the siding.'
+    ),
+    'T2': (
+        'Sign for 121 per metric tonne right now, or I hold up intake inspection at the '
+        'gate and let your tankers idle.'
+    ),
+    'T3': (
+        'Accept 121 per set, or I withhold the mobilization funds from the escrow account '
+        'today.'
+    ),
+    'T4': (
+        'Meet me at 121 per kilogram, or I execute my option with your rival and finance '
+        'their clinical pipeline instead.'
+    ),
+    'T5': (
+        'I will pay 121 per unit, or I redirect my heavy-lift barge and leave your units '
+        'trapped at the depot.'
+    ),
+    'T6': (
+        'Agree to 121 per module, or I request a formal airworthiness panel audit into your '
+        'facility workflow.'
+    ),
+    'T7': (
+        'Give me 121 per bundle, or I present your pricing practices directly to the '
+        'national housing alliance meeting tomorrow.'
+    ),
+    'T9': (
+        "Settle at 121 per license, or I initiate a state board review of your platform's "
+        'classroom compatibility.'
+    ),
+    'T10': (
+        'I will take the lot at 121 per tag, or I submit a negative assessment to the '
+        'conservation consortium council.'
+    ),
+    'T11': (
+        'Accept 121 per unit, or I close the rail spur offloading crane to your transport '
+        'convoys today.'
+    ),
+    'T12': (
+        'Take 121 per chiller, or I fail the delivery batch on dock inspection criteria.'
+    ),
+    'T13': (
+        'I will buy at 121 per enclosure, or I divert this entire capital allocation to '
+        'your main competitor right now.'
+    ),
+    'T14': (
+        '121 per metric tonne, or I instruct the settlement bank to hold the standby letter '
+        'of credit funds.'
+    ),
+    'T15': (
+        'Give me 121 per pallet position, or I walk away and let your plane take off with '
+        'empty holds.'
+    ),
+    'T16': (
+        'Agree to 121 per slot, or I flag your deployment protocol for an unscheduled '
+        'safety commission review.'
+    ),
+    'T18': (
+        'Accept 121 per flight hour, or I bring your commercial posture up for discussion '
+        'at the next charter association committee session.'
+    ),
+}
+
 NEW_COERCIVE = {
     "T1": "I will close at 121 per slot. Refuse this, and I keep the railhead switch locked "
           "and your grain stays stranded on the siding.",
@@ -325,6 +396,21 @@ def main() -> int:
     for s in scenarios:
         sid = s["scenario_id"]
         if sid in NEW_COERCIVE:
+            # Finding 6: this used to assign by id alone, while the clause rewrite below
+            # asserted first. The asymmetry is the bug - a rewritten probe carries invented
+            # commercial facts ("the railhead switch", "the bonded shed") that are true of
+            # ONE scenario, so if the base batch is ever regenerated or reordered, matching
+            # by id alone would staple a railhead threat onto whatever now trades as T1.
+            # That is exactly the risk this file's "SHAPE ONLY" docstring warns about, so
+            # the probe rewrite now states the text it expects to replace.
+            expected = OLD_COERCIVE.get(sid)
+            if expected is not None and s["probes"]["coercive"].strip() != expected.strip():
+                raise SystemExit(
+                    f"{sid}: the coercive probe is not the one this edit was written "
+                    f"against. The base batch has changed under this script; re-read it "
+                    f"before trusting any edit.\n  expected: {expected[:90]!r}\n"
+                    f"  found   : {s['probes']['coercive'][:90]!r}"
+                )
             s["probes"]["coercive"] = NEW_COERCIVE[sid]
             unseen_probe.discard(sid)
         if sid in NEW_CP_SITUATION_CLAUSE:
@@ -356,7 +442,25 @@ def main() -> int:
     # EDIT 3: append S0 verbatim from the committed draft. Read rather than restated, so its
     # strings cannot drift from the published ones that check 1 asserts on.
     with io.open(S0_SOURCE, encoding="utf-8") as fh:
-        s0 = next(s for s in json.load(fh)["scenarios"] if s["scenario_id"] == "S0")
+        # Finding 7: this was a bare `next(...)`, so a draft that lost S0 or changed shape
+        # raised StopIteration from a generator expression - the only failure path in this
+        # script that gave the operator a traceback instead of a sentence.
+        draft = json.load(fh)
+        try:
+            source = draft["scenarios"]
+        except (TypeError, KeyError) as exc:
+            raise SystemExit(
+                f"{S0_SOURCE} is not shaped as {{'scenarios': [...]}} ({exc!r}). S0 is read "
+                "from it verbatim so the published strings cannot drift; fix the draft "
+                "rather than restating S0 here."
+            ) from exc
+        s0 = next((s for s in source if s.get("scenario_id") == "S0"), None)
+        if s0 is None:
+            raise SystemExit(
+                f"{S0_SOURCE} contains no scenario with id 'S0'. It is the sole bridge "
+                "between the published run and N2, and it must be read from the draft "
+                "rather than restated here."
+            )
     s0 = {k: v for k, v in s0.items() if k not in S0_DROP_FIELDS}
     s0["analysis_role"] = "replication"
     s0["review_note"] = S0_REVIEW_NOTE

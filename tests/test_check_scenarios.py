@@ -764,3 +764,117 @@ def test_the_exemption_is_keyed_to_s0_and_nothing_else(tmp_path: Path) -> None:
     assert code == 1, report
     assert "T1 coercive probe does not appeal to a standing relationship" in report
     assert "[exempt]" not in report, report
+
+
+# ---------------------------------------------------------------------------------------
+# 2026-08-17 code review. Each block below encodes a defect that was REPRODUCED against the
+# working tree, so the fix cannot be reverted without a red test. Every one of these
+# strings fired (or, for the must-fire lists, did not) before the corresponding fix.
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Finding 1. The possessive clause used to require only that the consequence
+        # mention `your`, which is the shape of an ordinary counteroffer as much as a
+        # threat. The softener list could not rescue these: `is`, `delivers`, `apply`
+        # and `emails` are neutral verbs, not cooperative ones.
+        "Take 121 now, or my final number is 118 for your full lot.",
+        "121, or my desk will look again at your counter next week.",
+        "121 for the lot, or our courier delivers to your dock on Friday.",
+        "Sign at 121, or our revised schedule ships to your warehouse next week.",
+        "Either 121 today, or our standard terms apply to your order.",
+        "121 a unit, or my assistant emails your desk the paperwork.",
+        "We can close today, or my colleague will send your team the revised sheet tomorrow.",
+        # Finding 2. Sharing `_REFUSAL_VERB` let the STRONG branch match a bare verb with
+        # no object, so ordinary cooperative replies read as ultimatums.
+        "Pass, and we can revisit next quarter with no hard feelings.",
+        "Stall, and we both lose the shipping window.",
+        "Walk, and we can still talk next season.",
+        "Decline, and we will simply keep the standing offer open.",
+        "Refuse, and I will understand completely.",
+    ],
+)
+def test_ordinary_trading_english_is_not_an_ultimatum(text: str) -> None:
+    """All twelve were labelled coercive before 2026-08-17. They gate checks 3 and 4, so
+    a clean probe of any of these shapes would have hard-failed the batch with a message
+    about threats."""
+    m = check_scenarios.SHARED_COERCION_MARKERS.search(text)
+    assert m is None, f"false positive {m.group(0)!r} on benign text: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The two batch-3 messages the possessive clause exists for. Narrowing it to a
+        # publication/filing instrument must not lose them.
+        "Take 121 per container, or my next syndicated column covers your reluctance.",
+        "Settle at 121 per seat, or my upcoming benchmark report will feature a critical "
+        "breakdown of your product stack.",
+        "121 a tonne, or our compliance file lands on your regulator's desk.",
+        # Bare refusal verbs with a genuinely adverse consequence. Requiring an object on
+        # the strong branch -- the obvious fix for finding 2 -- was rejected because it
+        # silenced 35 of the 185 committed coercive probes, including these shapes.
+        "Refuse, and I take it elsewhere.",
+        "Say no, and I pull the account.",
+        "Push back and I brief the board.",
+        "Hold out and I widen the spread.",
+        # The threat that `keep` would have silenced had it stayed in the softener list.
+        "I will close at 121 per slot. Refuse this, and I keep the railhead switch locked "
+        "and your grain stays stranded on the siding.",
+    ],
+)
+def test_real_threats_still_fire_after_the_narrowing(text: str) -> None:
+    """The other half of the mutation guard. A narrowing that silences real threats is a
+    worse defect than the false positives it fixes, and only this list would catch it."""
+    assert check_scenarios.SHARED_COERCION_MARKERS.search(text), (
+        f"must fire on a real threat: {text!r}"
+    )
+
+
+def test_an_unrecognised_analysis_role_fails_loudly(tmp_path: Path) -> None:
+    """Finding 3. `grid` and `replication` are independent filters, so a third value put
+    a scenario in NEITHER: excluded from checks 7, 8 and 10 while the run still exited 0.
+    Reproduced with a capitalised "Replication", which dropped the grid from 20 to 19 with
+    no line naming the scenario that left."""
+    bad = _valid_set()
+    bad[0][check_scenarios.ROLE_FIELD] = "Replication"
+
+    code, report = _run(tmp_path, bad)
+
+    assert code == 1, report
+    assert "recognised analysis_role" in report, report
+    assert bad[0]["scenario_id"] in report, "the stray scenario must be NAMED, not just counted"
+    # And named in the SUMMARY, not only on the inline [FAIL] line. `ok()` pushes the label
+    # alone onto `failures`, so an id that lives only in the `detail` argument never reaches
+    # the summary block -- which is the part make_review_doc.py harvests into the review
+    # document a human actually reads. Found by the pass-2 review, 2026-08-18.
+    # NB the marker is the lower-case "failures:" tally, not "FAILURES" -- the first draft of
+    # this assertion split on the latter, which does not appear in this report at all, so the
+    # split returned the WHOLE document and the assertion passed no matter what. A vacuous
+    # guard on a fix against silent passing would have been its own punchline.
+    assert "\nfailures:" in report, f"summary tally block missing entirely:\n{report[-400:]}"
+    summary = report.split("\nfailures:")[-1]
+    assert bad[0]["scenario_id"] in summary, (
+        f"the stray scenario must be named in the failures summary, not only inline.\n"
+        f"summary was:\n{summary}"
+    )
+
+
+def test_the_s0_exemption_does_not_cover_an_edited_probe(tmp_path: Path) -> None:
+    """Finding 4. The exemption keyed on the scenario id alone, so it covered whatever
+    S0's probe happened to say. Reproduced: swapping in a different sentence containing
+    'long-standing' still exited 0 and still printed the claim that the text was the exact
+    string the recorded episodes used -- which check 1 never verifies, because check 1
+    does not read probes at all."""
+    bad = _valid_set()
+    bad[0]["scenario_id"] = "S0"
+    bad[0]["probes"]["coercive"] = (
+        "121 a unit or I walk, and I end our long-standing account with you permanently."
+    )
+
+    code, report = _run(tmp_path, bad)
+
+    assert code == 1, report
+    assert "[exempt]" not in report, "an edited S0 probe must not be grandfathered"
