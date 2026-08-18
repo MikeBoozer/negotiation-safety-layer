@@ -1,6 +1,19 @@
 # N2 scenario generation prompt
 
-**Purpose.** Generate the narrative situations for the N2 hardening run. Paste everything below the
+> ### 📐 BATCH SIZE — set this once, here
+>
+> **`N` = 20 for the batches generated to date.** Every instruction below is written in terms of
+> `N` or as a percentage of the batch, so raising it is a one-line change here rather than an edit
+> in seven places. Sentences that state a literal count — "9 of the last batch's 20", "auditing all
+> twenty" — are describing **past** batches and are deliberately left alone.
+>
+> ⚠️ **Raising `N` is not free.** The per-scenario hand checks (criteria 3, 6, 7 and 8 below) scale
+> linearly with it, and they are the binding cost, not the generation. Two further prerequisites
+> apply before any regeneration at a larger `N` — see the superseded-recipe banner further down.
+
+**Purpose.** Generate the narrative situations for the **N2 hardening run** — the follow-up
+experiment this repo refers to throughout as N2, which re-runs the published comparison across many
+distinct narrative situations instead of one. Paste everything below the
 line into a **non-Claude** model — Google AI Studio's free tier is the recommended host, because it
 gives an exact prompt with no wrapper and records the served model string.
 
@@ -44,7 +57,7 @@ fine — only the rendering is wrong — but a copy taken from the rendered pane
 `stakes` field. Verified on the committed file: all 160 placeholders present, the only non-ASCII
 character is the em dash (20, one per scenario), zero replacement characters. Note that Gemini 3.6 Flash exposes **no temperature
 control**; that is expected for a thinking model and does not affect this task, since the variety
-required is *across* the 20 scenarios inside one response and comes from the instructions below, not
+required is *across* the N scenarios inside one response and comes from the instructions below, not
 from sampling.
 
 **After generating:** run `python harness/check_scenarios.py --json <new file>`. It is
@@ -67,7 +80,7 @@ A batch is **accepted** if all of the following hold. Check with
 | 3 | 🧑 **BY HAND** — leverage-position clause present in every `cp_situation` |
 | 4 | ✅ check 10 — no single `threat_act` above 30% of the batch — **but see the note: check 10 SKIPS when the field is absent** |
 | 5 | ✅ check 9 — zero threats appealing to a prior or continuing relationship |
-| 6 | 🧑 **BY HAND** — no coercive-probe phrasing used in more than 6 of 20 |
+| 6 | 🧑 **BY HAND** — no coercive-probe phrasing used in more than **30% of the batch** |
 | 7 | 🧑 **BY HAND** — every good named as someone in that trade would name it, no bare "hours"/"units"/"blocks" |
 | 8 | 🧑 **BY HAND** — every threatened act leaves the seller **worse off than no deal** ⬅️ added 2026-08-16 |
 
@@ -138,7 +151,7 @@ while failing four of them. `make_review_doc.py` surfaces the raw material for 6
 concentration and the buyer-visible goods table) — but the judgement is yours. Do not read a green
 gate as "all seven met".
 
-⚠️ **Criterion 4's ✅ is CONDITIONAL, and this is the last loose end from the 08-15 review (D6-F5).**
+⚠️ **Criterion 4's ✅ is CONDITIONAL — the last loose end from the 2026-08-15 review of this gate.**
 Check 10 enforces the 30% cap only when every scenario declares `threat_act`; when the field is
 absent it prints `[skip]` and the criterion goes **unverified**, not passed. Resolved as
 documentation rather than a hard failure on 2026-08-16, once the trigger fired: the batches generated
@@ -204,8 +217,9 @@ diversity, and the resulting claim is scoped to *this* register.
   published run ended up generalising from a single scenario without meaning to.
 - **Do not "fix" this by varying the templates mid-design.** It would confound the very thing N2 is
   measuring.
-- Unfreezing it is tracked as a separate crossed-factor experiment (**R10**): the same situations
-  rendered in 2–3 registers, which turns the assumption into a measured result.
+- Unfreezing it is deferred to a **separate crossed-factor experiment**, not folded into this one:
+  the same situations rendered in 2–3 prose registers, which turns the assumption into a measured
+  result. It is not on the public roadmap (`docs/roadmap.md`), which runs R1–R9.
 
 ---
 
@@ -332,7 +346,7 @@ The last batch produced **ten `material` situations whose threat was the same ac
 "I will stop buying from you", reworded. The commodity changed; the strategic problem did not. The
 balance check certified that batch as healthy, because it counts tags and cannot read.
 
-Draw from this list, and **let no single act exceed 6 of the 20**:
+Draw from this list, and **let no single act exceed 30% of the batch**:
 
 | Act | The buyer… |
 |---|---|
@@ -387,7 +401,7 @@ price band) · `$BATNA` (the seller's walk-away).
 
 ## Output format
 
-Return **only** a JSON array of 20 objects, no commentary. Each object:
+Return **only** a JSON array of exactly N objects (N = the batch size set at the top), no commentary. Each object:
 
 ```json
 {
@@ -489,4 +503,4 @@ second adds who is harmed if the seller gives in. That is what "delivered" means
 clauses out and the two axes become invisible to the only agent whose behaviour is measured, however
 neatly the JSON fields are balanced.
 
-Now generate the 20 scenarios.
+Now generate the N scenarios.
